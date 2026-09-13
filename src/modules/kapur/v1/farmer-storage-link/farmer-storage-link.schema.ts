@@ -1,0 +1,157 @@
+import { z } from 'zod';
+import mongoose from 'mongoose';
+
+export const quickRegisterFarmerSchema = z.object({
+  body: z.object({
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Name must be at least 2 characters long')
+      .max(100, 'Name must not exceed 100 characters'),
+
+    address: z
+      .string()
+      .trim()
+      .min(1, 'Address is required')
+      .max(500, 'Address must not exceed 500 characters'),
+
+    mobileNumber: z
+      .string()
+      .trim()
+      .length(10, 'Mobile number must be exactly 10 digits')
+      .regex(
+        /^[6-9]\d{9}$/,
+        'Mobile number must be a valid 10-digit Indian mobile number starting with 6-9'
+      ),
+
+    imageUrl: z.string().trim().optional(),
+
+    coldStorageId: z
+      .string()
+      .trim()
+      .min(1, 'Cold storage ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid cold storage ID format'
+      ),
+
+    linkedById: z
+      .string()
+      .trim()
+      .min(1, 'Store admin ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid store admin ID format'
+      ),
+
+    accountNumber: z.coerce
+      .number()
+      .int()
+      .positive('Account number must be a positive integer')
+      .optional(),
+
+    aadharCardNumber: z
+      .string()
+      .trim()
+      .max(12, 'Aadhar card number must not exceed 12 characters')
+      .optional(),
+
+    panCardNumber: z
+      .string()
+      .trim()
+      .max(10, 'PAN card number must not exceed 10 characters')
+      .optional(),
+
+    costPerBag: z.coerce.number().optional(),
+  }),
+});
+
+export type QuickRegisterFarmerInput = z.infer<
+  typeof quickRegisterFarmerSchema
+>['body'];
+
+export const updateFarmerStorageLinkSchema = z.object({
+  params: z.object({
+    id: z
+      .string()
+      .trim()
+      .min(1, 'ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid ID format'
+      ),
+  }),
+  body: z.object({
+    name: z
+      .string()
+      .trim()
+      .min(2, 'Name must be at least 2 characters long')
+      .max(100, 'Name must not exceed 100 characters')
+      .optional(),
+
+    address: z
+      .string()
+      .trim()
+      .min(1, 'Address is required')
+      .max(500, 'Address must not exceed 500 characters')
+      .optional(),
+
+    mobileNumber: z
+      .string()
+      .trim()
+      .length(10, 'Mobile number must be exactly 10 digits')
+      .regex(
+        /^[6-9]\d{9}$/,
+        'Mobile number must be a valid 10-digit Indian mobile number starting with 6-9'
+      )
+      .optional(),
+
+    imageUrl: z.string().trim().optional(),
+
+    accountNumber: z.coerce
+      .number()
+      .int()
+      .positive('Account number must be a positive integer')
+      .optional(),
+
+    isActive: z.boolean().optional(),
+
+    notes: z.string().trim().optional(),
+
+    linkedById: z
+      .string()
+      .trim()
+      .refine(
+        (val) => !val || mongoose.Types.ObjectId.isValid(val),
+        'Invalid store admin ID format'
+      )
+      .optional(),
+
+    costPerBag: z.coerce.number().optional(),
+  }),
+});
+
+export type UpdateFarmerStorageLinkParams = z.infer<
+  typeof updateFarmerStorageLinkSchema
+>['params'];
+
+export type UpdateFarmerStorageLinkInput = z.infer<
+  typeof updateFarmerStorageLinkSchema
+>['body'];
+
+export const getGatePassesParamsSchema = z.object({
+  params: z.object({
+    farmerStorageLinkId: z
+      .string()
+      .trim()
+      .min(1, 'Farmer storage link ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid farmer storage link ID format'
+      ),
+  }),
+});
+
+export type GetGatePassesParams = z.infer<
+  typeof getGatePassesParamsSchema
+>['params'];

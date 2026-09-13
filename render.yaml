@@ -1,0 +1,10 @@
+# Render Blueprint: ensures the TypeScript build runs before start
+# so dist/server.js exists (dist/ is gitignored and not in the repo).
+services:
+  - type: web
+    name: bhatti-backend
+    runtime: node
+    # Use repo root so build creates dist/ and start finds dist/server.js (not src/dist).
+    rootDir: .
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
