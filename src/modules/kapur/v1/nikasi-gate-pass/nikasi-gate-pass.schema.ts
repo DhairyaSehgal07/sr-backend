@@ -12,6 +12,7 @@ const nikasiBagSizeSchema = z.object({
     .number()
     .int()
     .min(0, 'Quantity issued must be non-negative'),
+  costPerBag: z.coerce.number().min(0, 'Cost per bag must be non-negative'),
 });
 
 export const createNikasiGatePassSchema = z.object({
@@ -48,6 +49,15 @@ export const createNikasiGatePassSchema = z.object({
     .int('Bitli number must be an integer')
     .positive('Bitli number must be a positive number')
     .optional(),
+
+  billBookId: z
+    .string()
+    .trim()
+    .min(1, 'Bill book ID is required')
+    .refine(
+      (val) => mongoose.Types.ObjectId.isValid(val),
+      'Invalid bill book ID format'
+    ),
 
   billBook: z
     .string()
@@ -144,6 +154,7 @@ export interface NikasiReportBagSize {
   size: string;
   variety: string;
   quantityIssued: number;
+  costPerBag?: number;
 }
 
 export interface NikasiReportDispatchLedger {
@@ -168,6 +179,7 @@ export interface NikasiReport {
   isBooked?: boolean;
   billNumber?: number;
   bitliNumber?: number;
+  billBookId?: string;
   billBook?: string;
   biltiBook?: string;
   category: string;

@@ -16,6 +16,9 @@ import type {
   CreateNikasiGatePassInput,
   NikasiReport,
 } from './nikasi-gate-pass.schema.js';
+import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
+import { billedPaiseFromBagLines } from '../finances/money.js';
+import { postFinanceSaleFromNikasi } from '../finances/finances.service.js';
 import {
   AppError,
   ConflictError,
@@ -525,6 +528,25 @@ export async function createNikasiGatePass(
       );
     }
 
+    const billBook = await getActiveBillBookById(
+      payload.billBookId,
+      coldStorageId,
+      session
+    );
+
+    const amountPaise = billedPaiseFromBagLines(payload.bagSize);
+    if (amountPaise <= 0) {
+      throw new ValidationError(
+        'Billed amount must be greater than zero',
+        'BILLED_AMOUNT_REQUIRED'
+      );
+    }
+
+    const bags = payload.bagSize.reduce(
+      (total, line) => total + line.quantityIssued,
+      0
+    );
+
     const nikasiGatePass = new NikasiGatePass({
       dispatchLedgerId: new Types.ObjectId(payload.dispatchLedgerId),
       ...(createdBy && { createdBy: new Types.ObjectId(createdBy) }),
@@ -539,7 +561,8 @@ export async function createNikasiGatePass(
       ...(payload.bitliNumber !== undefined && {
         bitliNumber: payload.bitliNumber,
       }),
-      ...(payload.billBook !== undefined && { billBook: payload.billBook }),
+      billBookId: billBook._id,
+      billBook: billBook.name,
       ...(payload.biltiBook !== undefined && { biltiBook: payload.biltiBook }),
       category: payload.category,
       date: payload.date,
@@ -560,6 +583,30 @@ export async function createNikasiGatePass(
     });
 
     await nikasiGatePass.save({ session });
+
+    await postFinanceSaleFromNikasi({
+      coldStorageId: new Types.ObjectId(coldStorageId),
+      ...(createdBy && { createdBy: new Types.ObjectId(createdBy) }),
+      nikasi: {
+        _id: nikasiGatePass._id as Types.ObjectId,
+        date: nikasiGatePass.date,
+        gatePassNo: nikasiGatePass.gatePassNo,
+        ...(payload.billNumber !== undefined && {
+          billNumber: payload.billNumber,
+        }),
+        billBookId: billBook._id as Types.ObjectId,
+        billBookName: billBook.name,
+        dispatchLedgerId: dispatchLedger._id as Types.ObjectId,
+        dispatchLedgerName: dispatchLedger.name,
+        bags,
+        ...(payload.netWeight !== undefined && {
+          netWeight: payload.netWeight,
+        }),
+        amountPaise,
+      },
+      session,
+    });
+
     await session.commitTransaction();
     return nikasiGatePass;
   } catch (error) {
@@ -797,6 +844,7 @@ type NikasiGatePassReportLean = {
   isBooked?: boolean;
   billNumber?: number;
   bitliNumber?: number;
+  billBookId?: unknown;
   billBook?: string;
   biltiBook?: string;
   category: string;
@@ -808,6 +856,7 @@ type NikasiGatePassReportLean = {
     size: string;
     variety: string;
     quantityIssued: number;
+    costPerBag?: number;
   }>;
   remarks?: string;
   netWeight?: number;
@@ -865,6 +914,10 @@ function mapNikasiGatePassToReport(
 
   if (pass.bitliNumber != null) {
     report.bitliNumber = pass.bitliNumber;
+  }
+
+  if (pass.billBookId != null) {
+    report.billBookId = toObjectIdString(pass.billBookId);
   }
 
   if (pass.billBook != null) {

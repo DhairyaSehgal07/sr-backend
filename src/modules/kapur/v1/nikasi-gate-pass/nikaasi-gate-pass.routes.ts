@@ -32,7 +32,8 @@ const nikasiGatePassItemProperties = {
   isBooked: { type: 'boolean', description: 'Whether this pass is booked' },
   billNumber: { type: 'number', description: 'Bill number' },
   bitliNumber: { type: 'number', description: 'Bitli number' },
-  billBook: { type: 'string', description: 'Bill book' },
+  billBookId: { type: 'string', description: 'Bill book ID' },
+  billBook: { type: 'string', description: 'Bill book name' },
   biltiBook: { type: 'string', description: 'Bilti book' },
   category: { type: 'string', description: 'Category' },
   date: { type: 'string', format: 'date-time', description: 'Gate pass date' },
@@ -47,6 +48,7 @@ const nikasiGatePassItemProperties = {
         size: { type: 'string' },
         variety: { type: 'string' },
         quantityIssued: { type: 'number' },
+        costPerBag: { type: 'number' },
       },
     },
   },
@@ -78,6 +80,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             'date',
             'from',
             'bagSize',
+            'billBookId',
           ],
           properties: {
             dispatchLedgerId: {
@@ -104,9 +107,13 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
               type: 'number',
               description: 'Optional bitli number',
             },
+            billBookId: {
+              type: 'string',
+              description: 'Bill book ID',
+            },
             billBook: {
               type: 'string',
-              description: 'Optional bill book',
+              description: 'Ignored if provided; name is copied from bill book',
             },
             biltiBook: {
               type: 'string',
@@ -129,13 +136,18 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
               minItems: 1,
               items: {
                 type: 'object',
-                required: ['size', 'variety', 'quantityIssued'],
+                required: ['size', 'variety', 'quantityIssued', 'costPerBag'],
                 properties: {
                   size: { type: 'string' },
                   variety: { type: 'string' },
                   quantityIssued: {
                     type: 'number',
                     minimum: 0,
+                  },
+                  costPerBag: {
+                    type: 'number',
+                    minimum: 0,
+                    description: 'Cost per bag in rupees',
                   },
                 },
               },

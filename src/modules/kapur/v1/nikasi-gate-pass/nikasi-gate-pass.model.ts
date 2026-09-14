@@ -8,6 +8,7 @@ interface INikasiBagSize {
   size: string;
   variety: string;
   quantityIssued: number;
+  costPerBag: number;
 }
 
 export interface INikasiGatePass extends Document {
@@ -19,6 +20,7 @@ export interface INikasiGatePass extends Document {
 
   billNumber?: number;
   bitliNumber?: number;
+  billBookId: Types.ObjectId;
   billBook?: string;
   biltiBook?: string;
   category: string;
@@ -67,6 +69,12 @@ const NikasiBagSizeSchema = new Schema<INikasiBagSize>(
       required: true,
       min: 0,
     },
+
+    costPerBag: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
   },
   { _id: false }
 );
@@ -111,6 +119,13 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
 
     bitliNumber: {
       type: Number,
+    },
+
+    billBookId: {
+      type: Schema.Types.ObjectId,
+      ref: 'BillBook',
+      required: true,
+      index: true,
     },
 
     billBook: {

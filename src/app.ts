@@ -17,6 +17,8 @@ import { analyticsRoutes } from './modules/kapur/v1/analytics/analytics.routes.j
 import { temperatureRoutes } from './modules/kapur/v1/temperature/temperature.routes.js';
 import { dispatchLedgerRoutes } from './modules/kapur/v1/dispatch-ledger/dispatch-ledger.routes.js';
 import { bookingRoutes } from './modules/kapur/v1/booking/booking.routes.js';
+import { billBookRoutes } from './modules/kapur/v1/bill-book/bill-book.routes.js';
+import { financesRoutes } from './modules/kapur/v1/finances/finances.routes.js';
 import { outgoingGatePassRoutes } from './modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.routes.js';
 import { transferStockRoutes } from './modules/kapur/v1/transfer-stock/transfer-stock.routes.js';
 config();
@@ -152,6 +154,16 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // Register booking routes
   await fastify.register(bookingRoutes, {
     prefix: '/api/v1/booking',
+  });
+
+  // Register bill book routes
+  await fastify.register(billBookRoutes, {
+    prefix: '/api/v1/bill-book',
+  });
+
+  // Register finances routes
+  await fastify.register(financesRoutes, {
+    prefix: '/api/v1/finances',
   });
 
   // Global error handler

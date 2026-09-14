@@ -33,6 +33,10 @@ import { BookingAudit } from '../modules/kapur/v1/booking/booking-audit.model.js
 import { OutgoingGatePass } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.model.js';
 import { OutgoingGatePassAudit } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass-audit.model.js';
 import { TransferStockGatePass } from '../modules/kapur/v1/transfer-stock/transfer-stock.model.js';
+import { BillBook } from '../modules/kapur/v1/bill-book/bill-book.model.js';
+import { FinanceSale } from '../modules/kapur/v1/finances/finance-sale.model.js';
+import { FinanceRecovery } from '../modules/kapur/v1/finances/finance-recovery.model.js';
+import { FinanceJournal } from '../modules/kapur/v1/finances/finance-journal.model.js';
 
 const MODELS = [
   ColdStorage,
@@ -55,6 +59,10 @@ const MODELS = [
   OutgoingGatePass,
   OutgoingGatePassAudit,
   TransferStockGatePass,
+  BillBook,
+  FinanceSale,
+  FinanceRecovery,
+  FinanceJournal,
 ] as const;
 
 async function syncIndexes(): Promise<void> {
