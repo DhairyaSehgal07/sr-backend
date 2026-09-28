@@ -327,7 +327,6 @@ export async function transferStockRoutes(fastify: FastifyInstance) {
                       required: [
                         'size',
                         'quantityToAllocate',
-                        'weightInKg',
                         'chamber',
                         'floor',
                         'row',

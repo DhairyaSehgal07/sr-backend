@@ -15,7 +15,8 @@ const transferAllocationSchema = z.object({
       (val) => Math.abs(val * 100 - Math.round(val * 100)) < 1e-6,
       'Weight in kg must have at most 2 decimal places'
     )
-    .transform((val) => Math.round(val * 100) / 100),
+    .transform((val) => Math.round(val * 100) / 100)
+    .optional(),
   chamber: z.string().trim().min(1, 'Chamber is required'),
   floor: z.string().trim().min(1, 'Floor is required'),
   row: z.string().trim().min(1, 'Row is required'),
