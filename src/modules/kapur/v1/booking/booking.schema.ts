@@ -16,6 +16,10 @@ const bagSizeSchema = z.object({
     .number()
     .int()
     .min(0, 'Initial quantity must be non-negative'),
+  costPerBag: z.coerce
+    .number()
+    .min(0, 'Cost per bag must be non-negative')
+    .optional(),
 });
 
 export const createBookingSchema = z.object({
@@ -40,6 +44,24 @@ export const createBookingSchema = z.object({
     .optional(),
 
   date: z.coerce.date(),
+
+  expectedDateOfDelivery: z.coerce.date().optional(),
+
+  bank: z
+    .string()
+    .trim()
+    .min(1, 'Bank must be non-empty if provided')
+    .max(100, 'Bank must not exceed 100 characters')
+    .optional(),
+
+  amount: z.coerce.number().min(0, 'Amount must be non-negative').optional(),
+
+  modeOfPayment: z
+    .string()
+    .trim()
+    .min(1, 'Mode of payment must be non-empty if provided')
+    .max(50, 'Mode of payment must not exceed 50 characters')
+    .optional(),
 
   bagSizes: z.array(bagSizeSchema).min(1, 'At least one bag size is required'),
 
@@ -82,6 +104,23 @@ export const updateBookingSchema = z.object({
         ])
         .optional(),
       date: z.coerce.date().optional(),
+      expectedDateOfDelivery: z.coerce.date().optional(),
+      bank: z
+        .string()
+        .trim()
+        .min(1, 'Bank must be non-empty if provided')
+        .max(100, 'Bank must not exceed 100 characters')
+        .optional(),
+      amount: z.coerce
+        .number()
+        .min(0, 'Amount must be non-negative')
+        .optional(),
+      modeOfPayment: z
+        .string()
+        .trim()
+        .min(1, 'Mode of payment must be non-empty if provided')
+        .max(50, 'Mode of payment must not exceed 50 characters')
+        .optional(),
       dispatchLedgerId: z
         .string()
         .trim()

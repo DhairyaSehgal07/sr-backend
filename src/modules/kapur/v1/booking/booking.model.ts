@@ -13,6 +13,7 @@ interface IBagSize {
   variety: string;
   currentQuantity: number;
   initialQuantity: number;
+  costPerBag?: number;
 }
 
 interface IEditHistory {
@@ -31,6 +32,11 @@ export interface IBooking extends Document {
   manualGatePassNumber?: number;
 
   date: Date;
+  expectedDateOfDelivery?: Date;
+
+  bank?: string;
+  amount?: number;
+  modeOfPayment?: string;
 
   bagSizes: IBagSize[];
 
@@ -72,6 +78,11 @@ const BagSizeSchema = new Schema<IBagSize>(
     initialQuantity: {
       type: Number,
       required: true,
+      min: 0,
+    },
+
+    costPerBag: {
+      type: Number,
       min: 0,
     },
   },
@@ -144,6 +155,25 @@ const BookingSchema = new Schema<IBooking>(
       type: Date,
       required: true,
       index: true,
+    },
+
+    expectedDateOfDelivery: {
+      type: Date,
+    },
+
+    bank: {
+      type: String,
+      trim: true,
+    },
+
+    amount: {
+      type: Number,
+      min: 0,
+    },
+
+    modeOfPayment: {
+      type: String,
+      trim: true,
     },
 
     bagSizes: {

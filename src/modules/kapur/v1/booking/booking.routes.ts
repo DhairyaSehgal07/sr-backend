@@ -44,6 +44,17 @@ export async function bookingRoutes(fastify: FastifyInstance) {
               format: 'date-time',
               description: 'Booking date',
             },
+            expectedDateOfDelivery: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Expected date of delivery',
+            },
+            bank: { type: 'string', description: 'Bank name' },
+            amount: { type: 'number', description: 'Payment amount' },
+            modeOfPayment: {
+              type: 'string',
+              description: 'Mode of payment',
+            },
             bagSizes: {
               type: 'array',
               items: {
@@ -64,6 +75,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                   initialQuantity: {
                     type: 'number',
                     description: 'Initial quantity',
+                  },
+                  costPerBag: {
+                    type: 'number',
+                    description: 'Cost per bag',
                   },
                 },
               },
@@ -601,7 +616,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       schema: {
         ...updateBookingSchema,
         description:
-          'Update a booking. Allowed fields: manualGatePassNumber, date, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity), remarks. gatePassNo cannot be changed. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update a booking. Allowed fields: manualGatePassNumber, date, expectedDateOfDelivery, bank, amount, modeOfPayment, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity, costPerBag), remarks. gatePassNo cannot be changed. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Booking'],
         summary: 'Update booking',
         params: {
@@ -620,6 +635,10 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                 'Manual gate pass number. Pass null to clear the value.',
             },
             date: { type: 'string', format: 'date-time' },
+            expectedDateOfDelivery: { type: 'string', format: 'date-time' },
+            bank: { type: 'string' },
+            amount: { type: 'number' },
+            modeOfPayment: { type: 'string' },
             dispatchLedgerId: { type: 'string' },
             bagSizes: {
               type: 'array',
@@ -636,6 +655,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                   variety: { type: 'string' },
                   currentQuantity: { type: 'number' },
                   initialQuantity: { type: 'number' },
+                  costPerBag: { type: 'number' },
                 },
               },
             },
