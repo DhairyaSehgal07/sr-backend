@@ -7,6 +7,7 @@ import type {
   UpdateBookingInput,
 } from './booking.schema.js';
 import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
+import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
 import {
   AppError,
   ConflictError,
@@ -15,6 +16,35 @@ import {
 } from '../../../../utils/errors.js';
 
 const BOOKING_SEARCH_RESULT_LIMIT = 100;
+
+const billBookPopulate = {
+  path: 'billBookId',
+  select: 'name',
+} as const;
+
+function liveBillBookName(billBookId: unknown): string | undefined {
+  if (
+    billBookId &&
+    typeof billBookId === 'object' &&
+    'name' in billBookId &&
+    typeof (billBookId as { name?: unknown }).name === 'string'
+  ) {
+    return (billBookId as { name: string }).name;
+  }
+
+  return undefined;
+}
+
+function withLiveBillBookName<
+  T extends { billBookId?: unknown; billBook?: string },
+>(doc: T): T {
+  const name = liveBillBookName(doc.billBookId);
+  if (name !== undefined) {
+    doc.billBook = name;
+  }
+
+  return doc;
+}
 
 const BOOKING_EDITABLE_FIELDS = [
   'manualGatePassNumber',
@@ -313,6 +343,7 @@ async function createSingleBooking(
     bank,
     amount,
     modeOfPayment,
+    billBookId,
     bagSizes,
     remarks,
     idempotencyKey,
@@ -321,13 +352,14 @@ async function createSingleBooking(
   if (idempotencyKey) {
     const existing = await Booking.findOne({ idempotencyKey })
       .session(session)
+      .populate(billBookPopulate)
       .lean();
     if (existing) {
       logger?.info(
         { idempotencyKey, bookingId: existing._id },
         'Idempotency: returning existing booking'
       );
-      return existing as IBooking;
+      return withLiveBillBookName(existing) as IBooking;
     }
   }
 
@@ -366,6 +398,10 @@ async function createSingleBooking(
     );
   }
 
+  const activeBillBook = billBookId
+    ? await getActiveBillBookById(billBookId, coldStorageId, session)
+    : undefined;
+
   const booking = new Booking({
     dispatchLedgerId: new Types.ObjectId(dispatchLedgerId),
     ...(createdBy && { createdBy: new Types.ObjectId(createdBy) }),
@@ -376,6 +412,9 @@ async function createSingleBooking(
     ...(bank !== undefined && { bank }),
     ...(amount !== undefined && { amount }),
     ...(modeOfPayment !== undefined && { modeOfPayment }),
+    ...(activeBillBook && {
+      billBookId: activeBillBook._id,
+    }),
     bagSizes: bagSizes.map((bs) => ({
       size: bs.size,
       variety: bs.variety,
@@ -389,13 +428,14 @@ async function createSingleBooking(
   });
 
   await booking.save({ session });
+  await booking.populate(billBookPopulate);
 
   logger?.info(
     { bookingId: booking._id, gatePassNo: booking.gatePassNo },
     'Booking created'
   );
 
-  return booking as IBooking;
+  return withLiveBillBookName(booking);
 }
 
 /**
@@ -478,6 +518,7 @@ export async function searchBookingsByNumber(
         select: 'name address mobileNumber',
       })
       .populate({ path: 'createdBy', select: 'name' })
+      .populate(billBookPopulate)
       .sort({ gatePassNo: -1, date: -1 })
       .limit(BOOKING_SEARCH_RESULT_LIMIT)
       .lean();
@@ -488,7 +529,9 @@ export async function searchBookingsByNumber(
     );
 
     return {
-      bookings: bookings as unknown as Array<Record<string, unknown>>,
+      bookings: bookings.map((booking) =>
+        withLiveBillBookName(booking)
+      ) as unknown as Array<Record<string, unknown>>,
     };
   } catch (error) {
     if (error instanceof ValidationError) {
@@ -573,6 +616,7 @@ export async function getPaginatedBookingsByColdStorage(
           select: 'name address mobileNumber',
         })
         .populate({ path: 'createdBy', select: 'name' })
+        .populate(billBookPopulate)
         .sort({ gatePassNo: sortDir, date: sortDir })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -593,7 +637,9 @@ export async function getPaginatedBookingsByColdStorage(
     );
 
     return {
-      bookings: bookings as unknown as Array<Record<string, unknown>>,
+      bookings: bookings.map((booking) =>
+        withLiveBillBookName(booking)
+      ) as unknown as Array<Record<string, unknown>>,
       pagination: { page, limit, total, totalPages },
     };
   } catch (error) {
@@ -663,6 +709,15 @@ export async function updateBooking(
     const updateData: Record<string, unknown> = { ...payload };
     const unsetFields: Record<string, 1> = {};
 
+    delete updateData.billBook;
+    if (payload.billBookId) {
+      const activeBillBook = await getActiveBillBookById(
+        payload.billBookId,
+        coldStorageId
+      );
+      updateData.billBookId = activeBillBook._id;
+    }
+
     if (updateData.manualGatePassNumber === null) {
       unsetFields.manualGatePassNumber = 1;
       delete updateData.manualGatePassNumber;
@@ -691,6 +746,7 @@ export async function updateBooking(
         select: 'name address mobileNumber',
       })
       .populate('createdBy', 'name mobileNumber')
+      .populate(billBookPopulate)
       .lean();
 
     if (!updatedBooking) {
@@ -722,7 +778,7 @@ export async function updateBooking(
       'Booking updated successfully'
     );
 
-    return updatedBooking;
+    return withLiveBillBookName(updatedBooking);
   } catch (error) {
     if (
       error instanceof NotFoundError ||

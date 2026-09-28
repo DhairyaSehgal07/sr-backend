@@ -63,6 +63,22 @@ export const createBookingSchema = z.object({
     .max(50, 'Mode of payment must not exceed 50 characters')
     .optional(),
 
+  billBookId: z
+    .string()
+    .trim()
+    .min(1, 'Bill book ID must be non-empty if provided')
+    .refine(
+      (val) => mongoose.Types.ObjectId.isValid(val),
+      'Invalid bill book ID format'
+    )
+    .optional(),
+
+  billBook: z
+    .string()
+    .trim()
+    .min(1, 'Bill book must be non-empty if provided')
+    .optional(),
+
   bagSizes: z.array(bagSizeSchema).min(1, 'At least one bag size is required'),
 
   remarks: z
@@ -120,6 +136,20 @@ export const updateBookingSchema = z.object({
         .trim()
         .min(1, 'Mode of payment must be non-empty if provided')
         .max(50, 'Mode of payment must not exceed 50 characters')
+        .optional(),
+      billBookId: z
+        .string()
+        .trim()
+        .min(1, 'Bill book ID must be non-empty if provided')
+        .refine(
+          (val) => mongoose.Types.ObjectId.isValid(val),
+          'Invalid bill book ID format'
+        )
+        .optional(),
+      billBook: z
+        .string()
+        .trim()
+        .min(1, 'Bill book must be non-empty if provided')
         .optional(),
       dispatchLedgerId: z
         .string()

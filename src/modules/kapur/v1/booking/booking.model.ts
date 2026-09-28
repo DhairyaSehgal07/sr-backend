@@ -37,6 +37,8 @@ export interface IBooking extends Document {
   bank?: string;
   amount?: number;
   modeOfPayment?: string;
+  billBookId?: Types.ObjectId;
+  billBook?: string;
 
   bagSizes: IBagSize[];
 
@@ -172,6 +174,17 @@ const BookingSchema = new Schema<IBooking>(
     },
 
     modeOfPayment: {
+      type: String,
+      trim: true,
+    },
+
+    billBookId: {
+      type: Schema.Types.ObjectId,
+      ref: 'BillBook',
+      index: true,
+    },
+
+    billBook: {
       type: String,
       trim: true,
     },

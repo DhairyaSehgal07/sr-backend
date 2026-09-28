@@ -14,6 +14,21 @@ import {
 } from './booking.schema.js';
 import { authenticate } from '../../../../utils/auth.js';
 
+const bookingBillBookResponseProperties = {
+  billBookId: {
+    type: 'object',
+    description: 'Populated bill book',
+    properties: {
+      _id: { type: 'string', description: 'Bill book ID' },
+      name: { type: 'string', description: 'Current bill book name' },
+    },
+  },
+  billBook: {
+    type: 'string',
+    description: 'Current bill book name from the bill book document',
+  },
+} as const;
+
 /**
  * Register booking routes
  * @param fastify - Fastify instance
@@ -54,6 +69,15 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             modeOfPayment: {
               type: 'string',
               description: 'Mode of payment',
+            },
+            billBookId: {
+              type: 'string',
+              description: 'Optional bill book ID',
+            },
+            billBook: {
+              type: 'string',
+              description:
+                'Ignored if provided; the response name comes from the bill book document',
             },
             bagSizes: {
               type: 'array',
@@ -96,7 +120,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             properties: {
               status: { type: 'string' },
               message: { type: 'string' },
-              data: { type: 'object', additionalProperties: true },
+              data: {
+                type: 'object',
+                properties: bookingBillBookResponseProperties,
+                additionalProperties: true,
+              },
             },
           },
           400: {
@@ -186,7 +214,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                 properties: {
                   bookings: {
                     type: 'array',
-                    items: { type: 'object', additionalProperties: true },
+                    items: {
+                      type: 'object',
+                      properties: bookingBillBookResponseProperties,
+                      additionalProperties: true,
+                    },
                   },
                 },
               },
@@ -366,7 +398,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
                 properties: {
                   bookings: {
                     type: 'array',
-                    items: { type: 'object', additionalProperties: true },
+                    items: {
+                      type: 'object',
+                      properties: bookingBillBookResponseProperties,
+                      additionalProperties: true,
+                    },
                   },
                   pagination: {
                     type: 'object',
@@ -616,7 +652,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       schema: {
         ...updateBookingSchema,
         description:
-          'Update a booking. Allowed fields: manualGatePassNumber, date, expectedDateOfDelivery, bank, amount, modeOfPayment, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity, costPerBag), remarks. gatePassNo cannot be changed. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update a booking. Allowed fields: manualGatePassNumber, date, expectedDateOfDelivery, bank, amount, modeOfPayment, billBookId, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity, costPerBag), remarks. gatePassNo cannot be changed. billBook in the request is ignored. The response billBook is the current name from the bill book document. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Booking'],
         summary: 'Update booking',
         params: {
@@ -639,6 +675,12 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             bank: { type: 'string' },
             amount: { type: 'number' },
             modeOfPayment: { type: 'string' },
+            billBookId: { type: 'string' },
+            billBook: {
+              type: 'string',
+              description:
+                'Ignored if provided; the response name comes from the bill book document',
+            },
             dispatchLedgerId: { type: 'string' },
             bagSizes: {
               type: 'array',
@@ -668,7 +710,11 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             type: 'object',
             properties: {
               success: { type: 'boolean' },
-              data: { type: 'object', additionalProperties: true },
+              data: {
+                type: 'object',
+                properties: bookingBillBookResponseProperties,
+                additionalProperties: true,
+              },
               message: { type: 'string' },
             },
           },

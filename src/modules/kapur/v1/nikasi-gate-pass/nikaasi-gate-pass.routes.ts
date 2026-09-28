@@ -32,8 +32,18 @@ const nikasiGatePassItemProperties = {
   isBooked: { type: 'boolean', description: 'Whether this pass is booked' },
   billNumber: { type: 'number', description: 'Bill number' },
   bitliNumber: { type: 'number', description: 'Bitli number' },
-  billBookId: { type: 'string', description: 'Bill book ID' },
-  billBook: { type: 'string', description: 'Bill book name' },
+  billBookId: {
+    type: 'object',
+    description: 'Populated bill book',
+    properties: {
+      _id: { type: 'string', description: 'Bill book ID' },
+      name: { type: 'string', description: 'Current bill book name' },
+    },
+  },
+  billBook: {
+    type: 'string',
+    description: 'Current bill book name from the bill book document',
+  },
   biltiBook: { type: 'string', description: 'Bilti book' },
   category: { type: 'string', description: 'Category' },
   date: { type: 'string', format: 'date-time', description: 'Gate pass date' },
@@ -118,7 +128,8 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             },
             billBook: {
               type: 'string',
-              description: 'Ignored if provided; name is copied from bill book',
+              description:
+                'Ignored if provided; the response name comes from the bill book document',
             },
             biltiBook: {
               type: 'string',
@@ -244,7 +255,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
       schema: {
         ...searchNikasiGatePassSchema,
         description:
-          "Search nikasi gate passes for the authenticated store admin's cold storage. Matches documents where the provided number equals gatePassNo, manualGatePassNumber, billNumber, bitliNumber, billBook, or biltiBook.",
+          "Search nikasi gate passes for the authenticated store admin's cold storage. Matches documents where the provided number equals gatePassNo, manualGatePassNumber, billNumber, bitliNumber, the current bill book name, or biltiBook.",
         tags: ['Nikasi Gate Pass'],
         summary: 'Search nikasi gate passes by number',
         body: {
@@ -254,7 +265,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             number: {
               type: 'number',
               description:
-                'Number to search. Matches gatePassNo, manualGatePassNumber, billNumber, bitliNumber, billBook, or biltiBook.',
+                'Number to search. Matches gatePassNo, manualGatePassNumber, billNumber, bitliNumber, the current bill book name, or biltiBook.',
             },
           },
         },

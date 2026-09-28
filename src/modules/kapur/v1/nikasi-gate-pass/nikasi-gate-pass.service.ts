@@ -16,6 +16,7 @@ import type {
   CreateNikasiGatePassInput,
   NikasiReport,
 } from './nikasi-gate-pass.schema.js';
+import { BillBook } from '../bill-book/bill-book.model.js';
 import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
 import { billedPaiseFromBagLines } from '../finances/money.js';
 import { postFinanceSaleFromNikasi } from '../finances/finances.service.js';
@@ -28,6 +29,35 @@ import {
 
 /** Safety cap for exact-number search results within a cold storage */
 const NIKASI_GATE_PASS_SEARCH_RESULT_LIMIT = 100;
+
+const billBookPopulate = {
+  path: 'billBookId',
+  select: 'name',
+} as const;
+
+function liveBillBookName(billBookId: unknown): string | undefined {
+  if (
+    billBookId &&
+    typeof billBookId === 'object' &&
+    'name' in billBookId &&
+    typeof (billBookId as { name?: unknown }).name === 'string'
+  ) {
+    return (billBookId as { name: string }).name;
+  }
+
+  return undefined;
+}
+
+function withLiveBillBookName<
+  T extends { billBookId?: unknown; billBook?: string },
+>(doc: T): T {
+  const name = liveBillBookName(doc.billBookId);
+  if (name !== undefined) {
+    doc.billBook = name;
+  }
+
+  return doc;
+}
 
 export interface NikasiGatePassDateFilters {
   dateFrom?: string;
@@ -468,6 +498,7 @@ export async function createNikasiGatePass(
         idempotencyKey: payload.idempotencyKey,
       })
         .session(session)
+        .populate(billBookPopulate)
         .lean();
 
       if (existing) {
@@ -479,7 +510,7 @@ export async function createNikasiGatePass(
           'Idempotency: returning existing nikasi gate pass'
         );
         await session.commitTransaction();
-        return existing as INikasiGatePass;
+        return withLiveBillBookName(existing) as INikasiGatePass;
       }
     }
 
@@ -562,7 +593,6 @@ export async function createNikasiGatePass(
         bitliNumber: payload.bitliNumber,
       }),
       billBookId: billBook._id,
-      billBook: billBook.name,
       ...(payload.biltiBook !== undefined && { biltiBook: payload.biltiBook }),
       category: payload.category,
       date: payload.date,
@@ -621,7 +651,8 @@ export async function createNikasiGatePass(
     });
 
     await session.commitTransaction();
-    return nikasiGatePass;
+    await nikasiGatePass.populate(billBookPopulate);
+    return withLiveBillBookName(nikasiGatePass);
   } catch (error) {
     await session.abortTransaction().catch(() => {});
     handleServiceError(error, logger);
@@ -695,6 +726,7 @@ export async function getPaginatedNikasiGatePassesByColdStorage(
           select: 'name address mobileNumber',
         })
         .populate({ path: 'createdBy', select: 'name' })
+        .populate(billBookPopulate)
         .sort({ gatePassNo: sortDir, date: sortDir })
         .skip((page - 1) * limit)
         .limit(limit)
@@ -715,9 +747,9 @@ export async function getPaginatedNikasiGatePassesByColdStorage(
     );
 
     return {
-      nikasiGatePasses: nikasiGatePasses as unknown as Array<
-        Record<string, unknown>
-      >,
+      nikasiGatePasses: nikasiGatePasses.map((pass) =>
+        withLiveBillBookName(pass)
+      ) as unknown as Array<Record<string, unknown>>,
       pagination: { page, limit, total, totalPages },
     };
   } catch (error) {
@@ -763,6 +795,18 @@ export async function searchNikasiGatePassesByNumber(
       return { nikasiGatePasses: [] };
     }
 
+    const matchingBillBooks = await BillBook.find({
+      coldStorageId: new Types.ObjectId(coldStorageId),
+      name: String(number),
+    })
+      .select('_id')
+      .lean();
+
+    const billBookMatch =
+      matchingBillBooks.length > 0
+        ? [{ billBookId: { $in: matchingBillBooks.map((book) => book._id) } }]
+        : [];
+
     const filter = {
       $and: [
         { dispatchLedgerId: { $in: dispatchLedgerIds } },
@@ -774,6 +818,7 @@ export async function searchNikasiGatePassesByNumber(
             { bitliNumber: number },
             { billBook: String(number) },
             { biltiBook: String(number) },
+            ...billBookMatch,
           ],
         },
       ],
@@ -785,6 +830,7 @@ export async function searchNikasiGatePassesByNumber(
         select: 'name address mobileNumber',
       })
       .populate({ path: 'createdBy', select: 'name' })
+      .populate(billBookPopulate)
       .sort({ gatePassNo: -1, date: -1 })
       .limit(NIKASI_GATE_PASS_SEARCH_RESULT_LIMIT)
       .lean();
@@ -795,9 +841,9 @@ export async function searchNikasiGatePassesByNumber(
     );
 
     return {
-      nikasiGatePasses: nikasiGatePasses as unknown as Array<
-        Record<string, unknown>
-      >,
+      nikasiGatePasses: nikasiGatePasses.map((pass) =>
+        withLiveBillBookName(pass)
+      ) as unknown as Array<Record<string, unknown>>,
     };
   } catch (error) {
     if (error instanceof ValidationError) {
@@ -857,7 +903,12 @@ type NikasiGatePassReportLean = {
   isBooked?: boolean;
   billNumber?: number;
   bitliNumber?: number;
-  billBookId?: unknown;
+  billBookId?:
+    | unknown
+    | {
+        _id?: unknown;
+        name?: string;
+      };
   billBook?: string;
   biltiBook?: string;
   category: string;
@@ -935,10 +986,21 @@ function mapNikasiGatePassToReport(
   }
 
   if (pass.billBookId != null) {
-    report.billBookId = toObjectIdString(pass.billBookId);
-  }
-
-  if (pass.billBook != null) {
+    const populated =
+      typeof pass.billBookId === 'object' &&
+      pass.billBookId !== null &&
+      '_id' in pass.billBookId
+        ? (pass.billBookId as { _id?: unknown; name?: string })
+        : undefined;
+    const billBookId = toObjectIdString(populated?._id ?? pass.billBookId);
+    if (billBookId) {
+      report.billBookId = billBookId;
+    }
+    const liveName = populated?.name ?? pass.billBook;
+    if (liveName != null) {
+      report.billBook = liveName;
+    }
+  } else if (pass.billBook != null) {
     report.billBook = pass.billBook;
   }
 
@@ -1045,6 +1107,7 @@ export async function getNikasiGatePassReport(
         select: 'name address mobileNumber',
       })
       .populate({ path: 'createdBy', select: 'name' })
+      .populate(billBookPopulate)
       .sort({ gatePassNo: -1, date: -1 })
       .lean();
 
