@@ -129,7 +129,7 @@ function toOutgoingPayload(
       allocations: sp.allocations.map((a) => ({
         size: a.size,
         quantityToAllocate: a.quantityToAllocate,
-        weightInKg: a.weightInKg,
+        weightInKg: 1,
         chamber: a.chamber,
         floor: a.floor,
         row: a.row,

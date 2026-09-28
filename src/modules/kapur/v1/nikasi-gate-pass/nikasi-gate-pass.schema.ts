@@ -85,6 +85,16 @@ export const createNikasiGatePassSchema = z.object({
     .max(50, 'Truck number must not exceed 50 characters')
     .optional(),
 
+  transportCompany: z.string().trim().optional(),
+
+  LSNumber: z.string().trim().optional(),
+
+  driverName: z.string().trim().optional(),
+
+  driverMobile: z.string().trim().optional(),
+
+  owner: z.string().trim().optional(),
+
   bagSize: z
     .array(nikasiBagSizeSchema)
     .min(1, 'At least one bag size is required'),
@@ -187,6 +197,11 @@ export interface NikasiReport {
   from: string;
   to?: string;
   truckNumber?: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
   bagSize: NikasiReportBagSize[];
   totalBags: number;
   remarks?: string;

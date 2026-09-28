@@ -31,6 +31,11 @@ export interface INikasiGatePass extends Document {
   to?: string;
 
   truckNumber?: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
 
   bagSize: INikasiBagSize[];
 
@@ -165,6 +170,31 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
       type: String,
       trim: true,
       maxlength: 50,
+    },
+
+    transportCompany: {
+      type: String,
+      trim: true,
+    },
+
+    LSNumber: {
+      type: String,
+      trim: true,
+    },
+
+    driverName: {
+      type: String,
+      trim: true,
+    },
+
+    driverMobile: {
+      type: String,
+      trim: true,
+    },
+
+    owner: {
+      type: String,
+      trim: true,
     },
 
     bagSize: {

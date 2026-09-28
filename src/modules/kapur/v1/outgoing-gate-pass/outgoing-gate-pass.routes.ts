@@ -28,8 +28,6 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             'gatePassNo',
             'date',
             'variety',
-            'from',
-            'to',
             'storageGatePasses',
           ],
           properties: {
@@ -54,6 +52,17 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
               type: 'string',
               description: 'Truck number (optional)',
             },
+            transportCompany: {
+              type: 'string',
+              description: 'Optional transport company',
+            },
+            LSNumber: { type: 'string', description: 'Optional LS number' },
+            driverName: { type: 'string', description: 'Optional driver name' },
+            driverMobile: {
+              type: 'string',
+              description: 'Optional driver mobile number',
+            },
+            owner: { type: 'string', description: 'Optional owner' },
             billNumber: { type: 'number', description: 'Bill number' },
             biltiNumber: { type: 'number', description: 'Bilti number' },
             billBook: { type: 'string', description: 'Bill book' },
@@ -271,7 +280,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, billNumber, biltiNumber, billBook, biltiBook, category. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, billNumber, biltiNumber, billBook, biltiBook, or category to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, category. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, or category to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Update outgoing gate pass',
         params: {
@@ -302,6 +311,26 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             truckNumber: {
               type: 'string',
               description: 'Truck number',
+            },
+            transportCompany: {
+              type: ['string', 'null'],
+              description: 'Transport company. Pass null to clear.',
+            },
+            LSNumber: {
+              type: ['string', 'null'],
+              description: 'LS number. Pass null to clear.',
+            },
+            driverName: {
+              type: ['string', 'null'],
+              description: 'Driver name. Pass null to clear.',
+            },
+            driverMobile: {
+              type: ['string', 'null'],
+              description: 'Driver mobile number. Pass null to clear.',
+            },
+            owner: {
+              type: ['string', 'null'],
+              description: 'Owner. Pass null to clear.',
             },
             remarks: { type: 'string', description: 'Remarks' },
             billNumber: {

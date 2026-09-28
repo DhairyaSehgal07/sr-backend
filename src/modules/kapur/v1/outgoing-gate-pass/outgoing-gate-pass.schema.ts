@@ -63,14 +63,24 @@ export const createOutgoingGatePassSchema = z.object({
     .min(1, 'Variety is required')
     .max(100, 'Variety must not exceed 100 characters'),
 
-  from: z.string().trim().min(1, 'From is required').max(200),
-  to: z.string().trim().min(1, 'To is required').max(200),
+  from: z.string().trim().min(1, 'From is required').max(200).optional(),
+  to: z.string().trim().min(1, 'To is required').max(200).optional(),
 
   truckNumber: z
     .string()
     .trim()
     .max(50, 'Truck number must not exceed 50 characters')
     .optional(),
+
+  transportCompany: z.string().trim().optional(),
+
+  LSNumber: z.string().trim().optional(),
+
+  driverName: z.string().trim().optional(),
+
+  driverMobile: z.string().trim().optional(),
+
+  owner: z.string().trim().optional(),
 
   billNumber: z.coerce
     .number()
@@ -187,12 +197,44 @@ export const updateOutgoingGatePassBodySchema = z
       ])
       .optional(),
     date: z.coerce.date().optional(),
-    from: z.string().trim().min(1, 'From is required').max(200).optional(),
-    to: z.string().trim().min(1, 'To is required').max(200).optional(),
+    from: z
+      .union([z.string().trim().min(1, 'From is required').max(200), z.null()])
+      .optional(),
+    to: z
+      .union([z.string().trim().min(1, 'To is required').max(200), z.null()])
+      .optional(),
     truckNumber: z
-      .string()
-      .trim()
-      .max(50, 'Truck number must not exceed 50 characters')
+      .union([
+        z.string().trim().max(50, 'Truck number must not exceed 50 characters'),
+        z.null(),
+      ])
+      .optional(),
+    transportCompany: z
+      .union([
+        z.string().trim().min(1, 'Transport company must be non-empty'),
+        z.null(),
+      ])
+      .optional(),
+    LSNumber: z
+      .union([
+        z.string().trim().min(1, 'LS number must be non-empty'),
+        z.null(),
+      ])
+      .optional(),
+    driverName: z
+      .union([
+        z.string().trim().min(1, 'Driver name must be non-empty'),
+        z.null(),
+      ])
+      .optional(),
+    driverMobile: z
+      .union([
+        z.string().trim().min(1, 'Driver mobile must be non-empty'),
+        z.null(),
+      ])
+      .optional(),
+    owner: z
+      .union([z.string().trim().min(1, 'Owner must be non-empty'), z.null()])
       .optional(),
     remarks: z
       .string()

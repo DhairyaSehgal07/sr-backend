@@ -40,6 +40,11 @@ const nikasiGatePassItemProperties = {
   from: { type: 'string', description: 'Source location' },
   to: { type: 'string', description: 'Destination location' },
   truckNumber: { type: 'string', description: 'Truck number' },
+  transportCompany: { type: 'string', description: 'Transport company' },
+  LSNumber: { type: 'string', description: 'LS number' },
+  driverName: { type: 'string', description: 'Driver name' },
+  driverMobile: { type: 'string', description: 'Driver mobile number' },
+  owner: { type: 'string', description: 'Owner' },
   bagSize: {
     type: 'array',
     items: {
@@ -131,6 +136,17 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             from: { type: 'string', description: 'Source location' },
             to: { type: 'string', description: 'Destination location' },
             truckNumber: { type: 'string', description: 'Truck number' },
+            transportCompany: {
+              type: 'string',
+              description: 'Optional transport company',
+            },
+            LSNumber: { type: 'string', description: 'Optional LS number' },
+            driverName: { type: 'string', description: 'Optional driver name' },
+            driverMobile: {
+              type: 'string',
+              description: 'Optional driver mobile number',
+            },
+            owner: { type: 'string', description: 'Optional owner' },
             bagSize: {
               type: 'array',
               minItems: 1,

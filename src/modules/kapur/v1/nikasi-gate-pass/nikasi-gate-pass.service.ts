@@ -571,6 +571,19 @@ export async function createNikasiGatePass(
       ...(payload.truckNumber !== undefined && {
         truckNumber: payload.truckNumber,
       }),
+      ...(payload.transportCompany !== undefined && {
+        transportCompany: payload.transportCompany,
+      }),
+      ...(payload.LSNumber !== undefined && {
+        LSNumber: payload.LSNumber,
+      }),
+      ...(payload.driverName !== undefined && {
+        driverName: payload.driverName,
+      }),
+      ...(payload.driverMobile !== undefined && {
+        driverMobile: payload.driverMobile,
+      }),
+      ...(payload.owner !== undefined && { owner: payload.owner }),
       bagSize: payload.bagSize,
       ...(payload.remarks !== undefined && { remarks: payload.remarks }),
       ...(payload.netWeight !== undefined && { netWeight: payload.netWeight }),
@@ -852,6 +865,11 @@ type NikasiGatePassReportLean = {
   from: string;
   to?: string;
   truckNumber?: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
   bagSize?: Array<{
     size: string;
     variety: string;
@@ -934,6 +952,26 @@ function mapNikasiGatePassToReport(
 
   if (pass.truckNumber != null) {
     report.truckNumber = pass.truckNumber;
+  }
+
+  if (pass.transportCompany != null) {
+    report.transportCompany = pass.transportCompany;
+  }
+
+  if (pass.LSNumber != null) {
+    report.LSNumber = pass.LSNumber;
+  }
+
+  if (pass.driverName != null) {
+    report.driverName = pass.driverName;
+  }
+
+  if (pass.driverMobile != null) {
+    report.driverMobile = pass.driverMobile;
+  }
+
+  if (pass.owner != null) {
+    report.owner = pass.owner;
   }
 
   if (pass.remarks != null) {

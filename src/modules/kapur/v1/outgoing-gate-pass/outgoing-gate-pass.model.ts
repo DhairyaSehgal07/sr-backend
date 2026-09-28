@@ -63,9 +63,14 @@ export interface IOutgoingGatePass extends Document {
   date: Date;
   variety: string;
 
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   truckNumber: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
 
   billNumber?: number;
   biltiNumber?: number;
@@ -285,13 +290,11 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
 
     from: {
       type: String,
-      required: true,
       trim: true,
     },
 
     to: {
       type: String,
-      required: true,
       trim: true,
     },
 
@@ -299,6 +302,31 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
       type: String,
       trim: true,
       default: '',
+    },
+
+    transportCompany: {
+      type: String,
+      trim: true,
+    },
+
+    LSNumber: {
+      type: String,
+      trim: true,
+    },
+
+    driverName: {
+      type: String,
+      trim: true,
+    },
+
+    driverMobile: {
+      type: String,
+      trim: true,
+    },
+
+    owner: {
+      type: String,
+      trim: true,
     },
 
     billNumber: {
