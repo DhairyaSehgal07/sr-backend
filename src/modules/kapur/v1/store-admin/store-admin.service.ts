@@ -565,6 +565,8 @@ function daybookOutgoingProjectStage(): mongoose.PipelineStage {
       billNumber: 1,
       biltiNumber: 1,
       billBook: 1,
+      billBookId: 1,
+      dispatchLedgerId: 1,
       biltiBook: 1,
       category: 1,
       costPerBag: 1,

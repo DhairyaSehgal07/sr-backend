@@ -66,11 +66,22 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             billNumber: { type: 'number', description: 'Bill number' },
             biltiNumber: { type: 'number', description: 'Bilti number' },
             billBook: { type: 'string', description: 'Bill book' },
+            billBookId: {
+              type: 'string',
+              description:
+                'Active bill book ID. Required when category is Direct Sale',
+            },
+            dispatchLedgerId: {
+              type: 'string',
+              description:
+                'Dispatch ledger ID. Required when category is Direct Sale',
+            },
             biltiBook: { type: 'string', description: 'Bilti book' },
             category: { type: 'string', description: 'Category' },
             costPerBag: {
               type: 'number',
-              description: 'Optional cost per bag',
+              description:
+                'Cost per bag. Required and greater than zero when category is Direct Sale',
             },
             storageGatePasses: {
               type: 'array',

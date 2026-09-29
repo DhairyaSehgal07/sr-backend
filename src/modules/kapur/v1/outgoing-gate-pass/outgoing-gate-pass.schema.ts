@@ -20,6 +20,18 @@ const outgoingAllocationSchema = z.object({
   row: z.string().trim().min(1, 'Row is required'),
 });
 
+export const DIRECT_SALE_CATEGORY = 'Direct Sale';
+
+const objectIdString = (label: string) =>
+  z
+    .string()
+    .trim()
+    .min(1, `${label} is required`)
+    .refine(
+      (val) => mongoose.Types.ObjectId.isValid(val),
+      `Invalid ${label} format`
+    );
+
 const outgoingStorageGatePassAllocationSchema = z.object({
   storageGatePassId: z
     .string()
@@ -34,117 +46,164 @@ const outgoingStorageGatePassAllocationSchema = z.object({
     .min(1, 'At least one allocation is required'),
 });
 
-export const createOutgoingGatePassSchema = z.object({
-  farmerStorageLinkId: z
-    .string()
-    .trim()
-    .min(1, 'Farmer storage link ID is required')
-    .refine(
-      (val) => mongoose.Types.ObjectId.isValid(val),
-      'Invalid farmer storage link ID format'
-    ),
+export const createOutgoingGatePassSchema = z
+  .object({
+    farmerStorageLinkId: z
+      .string()
+      .trim()
+      .min(1, 'Farmer storage link ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid farmer storage link ID format'
+      ),
 
-  gatePassNo: z.coerce
-    .number()
-    .int('Gate pass number must be an integer')
-    .positive('Gate pass number must be a positive number'),
+    gatePassNo: z.coerce
+      .number()
+      .int('Gate pass number must be an integer')
+      .positive('Gate pass number must be a positive number'),
 
-  manualGatePassNumber: z.coerce
-    .number()
-    .int('Manual gate pass number must be an integer')
-    .positive('Manual gate pass number must be a positive number')
-    .optional(),
+    manualGatePassNumber: z.coerce
+      .number()
+      .int('Manual gate pass number must be an integer')
+      .positive('Manual gate pass number must be a positive number')
+      .optional(),
 
-  date: z.coerce.date(),
+    date: z.coerce.date(),
 
-  variety: z
-    .string()
-    .trim()
-    .min(1, 'Variety is required')
-    .max(100, 'Variety must not exceed 100 characters'),
+    variety: z
+      .string()
+      .trim()
+      .min(1, 'Variety is required')
+      .max(100, 'Variety must not exceed 100 characters'),
 
-  from: z.string().trim().min(1, 'From is required').max(200).optional(),
-  to: z.string().trim().min(1, 'To is required').max(200).optional(),
+    from: z.string().trim().min(1, 'From is required').max(200).optional(),
+    to: z.string().trim().min(1, 'To is required').max(200).optional(),
 
-  truckNumber: z
-    .string()
-    .trim()
-    .max(50, 'Truck number must not exceed 50 characters')
-    .optional(),
+    truckNumber: z
+      .string()
+      .trim()
+      .max(50, 'Truck number must not exceed 50 characters')
+      .optional(),
 
-  transportCompany: z.string().trim().optional(),
+    transportCompany: z.string().trim().optional(),
 
-  LSNumber: z.string().trim().optional(),
+    LSNumber: z.string().trim().optional(),
 
-  driverName: z.string().trim().optional(),
+    driverName: z.string().trim().optional(),
 
-  driverMobile: z.string().trim().optional(),
+    driverMobile: z.string().trim().optional(),
 
-  owner: z.string().trim().optional(),
+    owner: z.string().trim().optional(),
 
-  billNumber: z.coerce
-    .number()
-    .int('Bill number must be an integer')
-    .positive('Bill number must be a positive number')
-    .optional(),
+    billNumber: z.coerce
+      .number()
+      .int('Bill number must be an integer')
+      .positive('Bill number must be a positive number')
+      .optional(),
 
-  biltiNumber: z.coerce
-    .number()
-    .int('Bilti number must be an integer')
-    .positive('Bilti number must be a positive number')
-    .optional(),
+    biltiNumber: z.coerce
+      .number()
+      .int('Bilti number must be an integer')
+      .positive('Bilti number must be a positive number')
+      .optional(),
 
-  billBook: z
-    .string()
-    .trim()
-    .min(1, 'Bill book must be non-empty if provided')
-    .optional(),
+    billBook: z
+      .string()
+      .trim()
+      .min(1, 'Bill book must be non-empty if provided')
+      .optional(),
 
-  biltiBook: z
-    .string()
-    .trim()
-    .min(1, 'Bilti book must be non-empty if provided')
-    .optional(),
+    biltiBook: z
+      .string()
+      .trim()
+      .min(1, 'Bilti book must be non-empty if provided')
+      .optional(),
 
-  category: z
-    .string()
-    .trim()
-    .min(1, 'Category must be non-empty if provided')
-    .max(100, 'Category must not exceed 100 characters')
-    .optional(),
+    category: z
+      .string()
+      .trim()
+      .min(1, 'Category must be non-empty if provided')
+      .max(100, 'Category must not exceed 100 characters')
+      .optional(),
 
-  costPerBag: z.coerce
-    .number()
-    .min(0, 'Cost per bag must be non-negative')
-    .optional(),
+    costPerBag: z.coerce
+      .number()
+      .min(0, 'Cost per bag must be non-negative')
+      .optional(),
 
-  storageGatePasses: z
-    .array(outgoingStorageGatePassAllocationSchema)
-    .min(1, 'At least one storage gate pass with allocations is required'),
+    dispatchLedgerId: objectIdString('Dispatch ledger ID').optional(),
 
-  remarks: z
-    .string()
-    .trim()
-    .max(500, 'Remarks must not exceed 500 characters')
-    .optional(),
+    billBookId: objectIdString('Bill book ID').optional(),
 
-  replacesOutgoingGatePassId: z
-    .string()
-    .trim()
-    .min(1, 'Replaces outgoing gate pass ID must be non-empty if provided')
-    .refine(
-      (val) => mongoose.Types.ObjectId.isValid(val),
-      'Invalid replaces outgoing gate pass ID format'
-    )
-    .optional(),
+    storageGatePasses: z
+      .array(outgoingStorageGatePassAllocationSchema)
+      .min(1, 'At least one storage gate pass with allocations is required'),
 
-  idempotencyKey: z
-    .string()
-    .trim()
-    .min(1, 'Idempotency key must be non-empty if provided')
-    .max(128)
-    .optional(),
-});
+    remarks: z
+      .string()
+      .trim()
+      .max(500, 'Remarks must not exceed 500 characters')
+      .optional(),
+
+    replacesOutgoingGatePassId: z
+      .string()
+      .trim()
+      .min(1, 'Replaces outgoing gate pass ID must be non-empty if provided')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid replaces outgoing gate pass ID format'
+      )
+      .optional(),
+
+    idempotencyKey: z
+      .string()
+      .trim()
+      .min(1, 'Idempotency key must be non-empty if provided')
+      .max(128)
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.category === DIRECT_SALE_CATEGORY) {
+      if (!data.dispatchLedgerId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['dispatchLedgerId'],
+          message: 'Dispatch ledger ID is required for Direct Sale',
+        });
+      }
+      if (!data.billBookId) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['billBookId'],
+          message: 'Bill book ID is required for Direct Sale',
+        });
+      }
+      if (data.costPerBag === undefined || data.costPerBag <= 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['costPerBag'],
+          message: 'Cost per bag must be greater than zero for Direct Sale',
+        });
+      }
+      return;
+    }
+
+    if (data.dispatchLedgerId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dispatchLedgerId'],
+        message:
+          'Dispatch ledger ID is only allowed when category is Direct Sale',
+      });
+    }
+    if (data.billBookId) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['billBookId'],
+        message: 'Bill book ID is only allowed when category is Direct Sale',
+      });
+    }
+  });
 
 export type CreateOutgoingGatePassInput = z.infer<
   typeof createOutgoingGatePassSchema

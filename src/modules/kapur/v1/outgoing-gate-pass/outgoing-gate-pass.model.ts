@@ -75,6 +75,8 @@ export interface IOutgoingGatePass extends Document {
   billNumber?: number;
   biltiNumber?: number;
   billBook?: string;
+  billBookId?: Types.ObjectId;
+  dispatchLedgerId?: Types.ObjectId;
   biltiBook?: string;
   category?: string;
   costPerBag?: number;
@@ -341,6 +343,17 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
     billBook: {
       type: String,
       trim: true,
+    },
+
+    billBookId: {
+      type: Schema.Types.ObjectId,
+      ref: 'BillBook',
+    },
+
+    dispatchLedgerId: {
+      type: Schema.Types.ObjectId,
+      ref: 'DispatchLedger',
+      index: true,
     },
 
     biltiBook: {

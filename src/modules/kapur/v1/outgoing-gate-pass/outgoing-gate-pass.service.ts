@@ -19,6 +19,11 @@ import type {
   CreateOutgoingGatePassInput,
   UpdateOutgoingGatePassInput,
 } from './outgoing-gate-pass.schema.js';
+import { DIRECT_SALE_CATEGORY } from './outgoing-gate-pass.schema.js';
+import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
+import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
+import { rupeesToPaise } from '../finances/money.js';
+import { postFinanceSaleFromNikasi } from '../finances/finances.service.js';
 import {
   ConflictError,
   NotFoundError,
@@ -642,6 +647,8 @@ async function formatOutgoingGatePassResponse(
       },
     })
     .populate({ path: 'createdBy', select: 'name' })
+    .populate({ path: 'dispatchLedgerId', select: 'name' })
+    .populate({ path: 'billBookId', select: 'name' })
     .lean();
 
   if (!populated) {
@@ -813,6 +820,92 @@ async function findOutgoingGatePassInColdStorage(
    CREATE OUTGOING GATE PASS
 ======================= */
 
+async function loadDirectSaleParty(
+  coldStorageId: string,
+  payload: CreateOutgoingGatePassInput,
+  session: ClientSession
+) {
+  if (!payload.dispatchLedgerId || !payload.billBookId) {
+    throw new ValidationError(
+      'Dispatch ledger and bill book are required for Direct Sale',
+      'DIRECT_SALE_PARTY_REQUIRED'
+    );
+  }
+
+  const dispatchLedger = await DispatchLedger.findOne({
+    _id: new Types.ObjectId(payload.dispatchLedgerId),
+    coldStorageId: new Types.ObjectId(coldStorageId),
+  })
+    .session(session)
+    .lean();
+
+  if (!dispatchLedger) {
+    throw new NotFoundError(
+      'Dispatch ledger not found',
+      'DISPATCH_LEDGER_NOT_FOUND'
+    );
+  }
+
+  const billBook = await getActiveBillBookById(
+    payload.billBookId,
+    coldStorageId,
+    session
+  );
+
+  return { dispatchLedger, billBook };
+}
+
+async function postDirectSaleFinance(params: {
+  coldStorageId: Types.ObjectId;
+  createdById?: string;
+  outgoing: {
+    _id: Types.ObjectId;
+    date: Date;
+    gatePassNo: number;
+    billNumber?: number;
+    costPerBag?: number;
+    orderDetails: Array<{ quantityIssued: number }>;
+  };
+  dispatchLedger: { _id: Types.ObjectId; name: string };
+  billBook: { _id: Types.ObjectId; name: string };
+  session: ClientSession;
+}) {
+  const bags = params.outgoing.orderDetails.reduce(
+    (total, line) => total + line.quantityIssued,
+    0
+  );
+  const amountPaise = rupeesToPaise(params.outgoing.costPerBag ?? 0) * bags;
+
+  if (amountPaise <= 0) {
+    throw new ValidationError(
+      'Billed amount must be greater than zero',
+      'BILLED_AMOUNT_REQUIRED'
+    );
+  }
+
+  await postFinanceSaleFromNikasi({
+    coldStorageId: params.coldStorageId,
+    ...(params.createdById && {
+      createdBy: new Types.ObjectId(params.createdById),
+    }),
+    nikasi: {
+      _id: params.outgoing._id,
+      date: params.outgoing.date,
+      gatePassNo: params.outgoing.gatePassNo,
+      ...(params.outgoing.billNumber !== undefined && {
+        billNumber: params.outgoing.billNumber,
+      }),
+      billBookId: params.billBook._id,
+      billBookName: params.billBook.name,
+      dispatchLedgerId: params.dispatchLedger._id,
+      dispatchLedgerName: params.dispatchLedger.name,
+      bags,
+      amountPaise,
+    },
+    session: params.session,
+  });
+}
+
 export async function createOutgoingGatePass(
   coldStorageId: string,
   payload: CreateOutgoingGatePassInput,
@@ -919,6 +1012,11 @@ export async function createOutgoingGatePass(
       storagePassMap
     );
 
+    const isDirectSale = payload.category === DIRECT_SALE_CATEGORY;
+    const directSaleParty = isDirectSale
+      ? await loadDirectSaleParty(coldStorageId, payload, session)
+      : undefined;
+
     const doc = await OutgoingGatePass.create(
       [
         {
@@ -948,7 +1046,13 @@ export async function createOutgoingGatePass(
           ...(payload.biltiNumber !== undefined && {
             biltiNumber: payload.biltiNumber,
           }),
-          ...(payload.billBook !== undefined && { billBook: payload.billBook }),
+          ...(directSaleParty && {
+            billBook: directSaleParty.billBook.name,
+            billBookId: directSaleParty.billBook._id,
+            dispatchLedgerId: directSaleParty.dispatchLedger._id,
+          }),
+          ...(!directSaleParty &&
+            payload.billBook !== undefined && { billBook: payload.billBook }),
           ...(payload.biltiBook !== undefined && {
             biltiBook: payload.biltiBook,
           }),
@@ -970,6 +1074,24 @@ export async function createOutgoingGatePass(
       ],
       { session }
     ).then((arr) => arr[0]);
+
+    if (directSaleParty) {
+      await postDirectSaleFinance({
+        coldStorageId: coldStorageObjectId,
+        createdById,
+        outgoing: {
+          _id: doc._id as Types.ObjectId,
+          date: doc.date,
+          gatePassNo: doc.gatePassNo,
+          ...(doc.billNumber !== undefined && { billNumber: doc.billNumber }),
+          costPerBag: doc.costPerBag,
+          orderDetails: doc.orderDetails,
+        },
+        dispatchLedger: directSaleParty.dispatchLedger,
+        billBook: directSaleParty.billBook,
+        session,
+      });
+    }
 
     await session.commitTransaction();
 
@@ -1325,6 +1447,8 @@ export async function recordOutgoingGatePassCreateAudit(
 /* =======================
    SHED SUMMARY
 ======================= */
+
+export { DIRECT_SALE_CATEGORY } from './outgoing-gate-pass.schema.js';
 
 export const OUTGOING_TO_SHED_CATEGORY = 'Outgoing to Shed';
 
