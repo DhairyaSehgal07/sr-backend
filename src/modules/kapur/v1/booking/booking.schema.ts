@@ -63,6 +63,13 @@ export const createBookingSchema = z.object({
     .max(50, 'Mode of payment must not exceed 50 characters')
     .optional(),
 
+  agent: z
+    .string()
+    .trim()
+    .min(1, 'Agent must be non-empty if provided')
+    .max(100, 'Agent must not exceed 100 characters')
+    .optional(),
+
   billBookId: z
     .string()
     .trim()
@@ -136,6 +143,12 @@ export const updateBookingSchema = z.object({
         .trim()
         .min(1, 'Mode of payment must be non-empty if provided')
         .max(50, 'Mode of payment must not exceed 50 characters')
+        .optional(),
+      agent: z
+        .string()
+        .trim()
+        .min(1, 'Agent must be non-empty if provided')
+        .max(100, 'Agent must not exceed 100 characters')
         .optional(),
       billBookId: z
         .string()

@@ -343,6 +343,7 @@ async function createSingleBooking(
     bank,
     amount,
     modeOfPayment,
+    agent,
     billBookId,
     bagSizes,
     remarks,
@@ -412,6 +413,7 @@ async function createSingleBooking(
     ...(bank !== undefined && { bank }),
     ...(amount !== undefined && { amount }),
     ...(modeOfPayment !== undefined && { modeOfPayment }),
+    ...(agent !== undefined && { agent }),
     ...(activeBillBook && {
       billBookId: activeBillBook._id,
     }),

@@ -70,6 +70,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
               type: 'string',
               description: 'Mode of payment',
             },
+            agent: { type: 'string', description: 'Optional agent name' },
             billBookId: {
               type: 'string',
               description: 'Optional bill book ID',
@@ -652,7 +653,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
       schema: {
         ...updateBookingSchema,
         description:
-          'Update a booking. Allowed fields: manualGatePassNumber, date, expectedDateOfDelivery, bank, amount, modeOfPayment, billBookId, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity, costPerBag), remarks. gatePassNo cannot be changed. billBook in the request is ignored. The response billBook is the current name from the bill book document. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update a booking. Allowed fields: manualGatePassNumber, date, expectedDateOfDelivery, bank, amount, modeOfPayment, agent, billBookId, dispatchLedgerId, bagSizes (size, variety, currentQuantity, initialQuantity, costPerBag), remarks. gatePassNo cannot be changed. billBook in the request is ignored. The response billBook is the current name from the bill book document. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Booking'],
         summary: 'Update booking',
         params: {
@@ -675,6 +676,7 @@ export async function bookingRoutes(fastify: FastifyInstance) {
             bank: { type: 'string' },
             amount: { type: 'number' },
             modeOfPayment: { type: 'string' },
+            agent: { type: 'string' },
             billBookId: { type: 'string' },
             billBook: {
               type: 'string',
