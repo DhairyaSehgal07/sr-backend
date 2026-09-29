@@ -77,6 +77,7 @@ export interface IOutgoingGatePass extends Document {
   billBook?: string;
   biltiBook?: string;
   category?: string;
+  costPerBag?: number;
 
   orderDetails: IOutgoingOrderDetail[];
   storageGatePassSnapshots: IOutgoingStorageGatePassSnapshot[];
@@ -350,6 +351,11 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
     category: {
       type: String,
       trim: true,
+    },
+
+    costPerBag: {
+      type: Number,
+      min: 0,
     },
 
     orderDetails: {

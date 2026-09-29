@@ -68,6 +68,10 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             billBook: { type: 'string', description: 'Bill book' },
             biltiBook: { type: 'string', description: 'Bilti book' },
             category: { type: 'string', description: 'Category' },
+            costPerBag: {
+              type: 'number',
+              description: 'Optional cost per bag',
+            },
             storageGatePasses: {
               type: 'array',
               description: 'Storage gate passes with allocations',
@@ -280,7 +284,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, category. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, or category to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Update outgoing gate pass',
         params: {
@@ -352,6 +356,10 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             category: {
               type: ['string', 'null'],
               description: 'Category. Pass null to clear.',
+            },
+            costPerBag: {
+              type: ['number', 'null'],
+              description: 'Cost per bag. Pass null to clear.',
             },
           },
         },

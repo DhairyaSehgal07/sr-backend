@@ -99,6 +99,7 @@ const OUTGOING_GATE_PASS_EDITABLE_FIELDS = [
   'billBook',
   'biltiBook',
   'category',
+  'costPerBag',
 ] as const;
 
 const OUTGOING_GATE_PASS_NULLABLE_UPDATE_FIELDS = [
@@ -116,6 +117,7 @@ const OUTGOING_GATE_PASS_NULLABLE_UPDATE_FIELDS = [
   'billBook',
   'biltiBook',
   'category',
+  'costPerBag',
 ] as const;
 
 function serializeOutgoingAuditValue(value: unknown): unknown {
@@ -951,6 +953,9 @@ export async function createOutgoingGatePass(
             biltiBook: payload.biltiBook,
           }),
           ...(payload.category !== undefined && { category: payload.category }),
+          ...(payload.costPerBag !== undefined && {
+            costPerBag: payload.costPerBag,
+          }),
           orderDetails,
           storageGatePassSnapshots,
           remarks: payload.remarks,

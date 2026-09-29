@@ -237,6 +237,10 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
                       type: 'string',
                       description: 'Outgoing pass: category',
                     },
+                    costPerBag: {
+                      type: 'number',
+                      description: 'Outgoing pass: cost per bag',
+                    },
                   },
                 },
               },

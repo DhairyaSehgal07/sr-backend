@@ -113,6 +113,11 @@ export const createOutgoingGatePassSchema = z.object({
     .max(100, 'Category must not exceed 100 characters')
     .optional(),
 
+  costPerBag: z.coerce
+    .number()
+    .min(0, 'Cost per bag must be non-negative')
+    .optional(),
+
   storageGatePasses: z
     .array(outgoingStorageGatePassAllocationSchema)
     .min(1, 'At least one storage gate pass with allocations is required'),
@@ -278,6 +283,12 @@ export const updateOutgoingGatePassBodySchema = z
           .trim()
           .min(1, 'Category must be non-empty')
           .max(100, 'Category must not exceed 100 characters'),
+        z.null(),
+      ])
+      .optional(),
+    costPerBag: z
+      .union([
+        z.coerce.number().min(0, 'Cost per bag must be non-negative'),
         z.null(),
       ])
       .optional(),

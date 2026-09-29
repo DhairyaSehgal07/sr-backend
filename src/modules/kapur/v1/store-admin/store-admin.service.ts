@@ -567,6 +567,7 @@ function daybookOutgoingProjectStage(): mongoose.PipelineStage {
       billBook: 1,
       biltiBook: 1,
       category: 1,
+      costPerBag: 1,
       orderDetails: {
         $sortArray: {
           input: { $ifNull: ['$orderDetails', []] },
