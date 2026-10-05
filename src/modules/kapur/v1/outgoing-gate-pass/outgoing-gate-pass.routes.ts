@@ -205,9 +205,9 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Get per-variety outgoing-to-shed summary with per-size bag quantities from ACTIVE outgoing gate passes with category "Outgoing to Shed". Optional dateFrom/dateTo filter by gate pass date.',
+          'Get outgoing-to-shed summary grouped by shed. First entry is always shed "all" (combined totals across all sheds), followed by one entry per shed. Each group contains per-variety rows with per-size bag quantities from ACTIVE outgoing gate passes with category "Outgoing to Shed". Passes without a shed are grouped under "Unspecified". Optional dateFrom/dateTo filter by gate pass date.',
         tags: ['Outgoing Gate Pass'],
-        summary: 'Get outgoing-to-shed summary by variety',
+        summary: 'Get outgoing-to-shed summary grouped by shed',
         querystring: {
           type: 'object',
           properties: {
@@ -224,7 +224,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             description:
-              'Array of { variety, quantity, sizes } with per-size bag quantity',
+              'Array of { shed, varieties } where shed "all" is first, then each shed. varieties is [{ variety, quantity, sizes }]',
             type: 'object',
             properties: {
               success: { type: 'boolean' },
@@ -233,15 +233,24 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
                 items: {
                   type: 'object',
                   properties: {
-                    variety: { type: 'string' },
-                    quantity: { type: 'number' },
-                    sizes: {
+                    shed: { type: 'string' },
+                    varieties: {
                       type: 'array',
                       items: {
                         type: 'object',
                         properties: {
-                          size: { type: 'string' },
+                          variety: { type: 'string' },
                           quantity: { type: 'number' },
+                          sizes: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                size: { type: 'string' },
+                                quantity: { type: 'number' },
+                              },
+                            },
+                          },
                         },
                       },
                     },

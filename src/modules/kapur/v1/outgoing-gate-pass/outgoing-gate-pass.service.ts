@@ -1471,14 +1471,44 @@ export interface OutgoingShedSummaryVarietyRow {
   sizes: OutgoingShedSummarySizeRow[];
 }
 
+export interface OutgoingShedSummaryGroup {
+  /** `"all"` for the combined total across sheds; otherwise the shed name */
+  shed: string;
+  varieties: OutgoingShedSummaryVarietyRow[];
+}
+
+function buildVarietyRowsFromSizeMaps(
+  byVariety: Map<string, Map<string, number>>
+): OutgoingShedSummaryVarietyRow[] {
+  const result: OutgoingShedSummaryVarietyRow[] = [];
+
+  for (const [variety, sizeMap] of byVariety) {
+    let quantity = 0;
+    const sizes: OutgoingShedSummarySizeRow[] = [];
+
+    for (const [size, sizeQuantity] of sizeMap) {
+      sizes.push({ size, quantity: sizeQuantity });
+      quantity += sizeQuantity;
+    }
+
+    sizes.sort((a, b) => a.size.localeCompare(b.size));
+    result.push({ variety, quantity, sizes });
+  }
+
+  result.sort((a, b) => a.variety.localeCompare(b.variety));
+  return result;
+}
+
 /**
- * Variety × size bag totals for ACTIVE outgoing passes with category "Outgoing to Shed".
+ * Variety × size bag totals for ACTIVE outgoing passes with category "Outgoing to Shed",
+ * grouped by shed. First entry is always `{ shed: "all", ... }` (combined totals),
+ * followed by one entry per shed.
  */
 export async function getOutgoingShedSummary(
   coldStorageId: string,
   filters: OutgoingShedSummaryDateFilters,
   logger?: FastifyBaseLogger
-): Promise<OutgoingShedSummaryVarietyRow[]> {
+): Promise<OutgoingShedSummaryGroup[]> {
   if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
     throw new ValidationError(
       'Invalid cold storage ID format',
@@ -1493,7 +1523,7 @@ export async function getOutgoingShedSummary(
     .lean();
 
   if (farmerStorageLinkIds.length === 0) {
-    return [];
+    return [{ shed: 'all', varieties: [] }];
   }
 
   const match: Record<string, unknown> = {
@@ -1529,7 +1559,7 @@ export async function getOutgoingShedSummary(
   }
 
   const grouped = await OutgoingGatePass.aggregate<{
-    _id: { variety: string; size: string };
+    _id: { shed: string; variety: string; size: string };
     quantity: number;
   }>([
     { $match: match },
@@ -1537,6 +1567,16 @@ export async function getOutgoingShedSummary(
     {
       $group: {
         _id: {
+          shed: {
+            $let: {
+              vars: {
+                trimmed: { $trim: { input: { $ifNull: ['$shed', ''] } } },
+              },
+              in: {
+                $cond: [{ $eq: ['$$trimmed', ''] }, 'Unspecified', '$$trimmed'],
+              },
+            },
+          },
           variety: { $ifNull: ['$variety', 'Unspecified'] },
           size: { $ifNull: ['$orderDetails.size', ''] },
         },
@@ -1545,38 +1585,53 @@ export async function getOutgoingShedSummary(
     },
   ]);
 
-  const byVariety = new Map<string, Map<string, number>>();
+  const byShed = new Map<string, Map<string, Map<string, number>>>();
+  const allByVariety = new Map<string, Map<string, number>>();
 
   for (const row of grouped) {
+    const shed = row._id.shed?.trim() || 'Unspecified';
     const variety = row._id.variety?.trim() || 'Unspecified';
     const size = row._id.size?.trim() || '';
 
-    let sizeMap = byVariety.get(variety);
+    let shedVarietyMap = byShed.get(shed);
+    if (!shedVarietyMap) {
+      shedVarietyMap = new Map();
+      byShed.set(shed, shedVarietyMap);
+    }
+
+    let sizeMap = shedVarietyMap.get(variety);
     if (!sizeMap) {
       sizeMap = new Map();
-      byVariety.set(variety, sizeMap);
+      shedVarietyMap.set(variety, sizeMap);
     }
     sizeMap.set(size, (sizeMap.get(size) ?? 0) + row.quantity);
-  }
 
-  const result: OutgoingShedSummaryVarietyRow[] = [];
-  for (const [variety, sizeMap] of byVariety) {
-    let quantity = 0;
-    const sizes: OutgoingShedSummarySizeRow[] = [];
-
-    for (const [size, sizeQuantity] of sizeMap) {
-      sizes.push({ size, quantity: sizeQuantity });
-      quantity += sizeQuantity;
+    let allSizeMap = allByVariety.get(variety);
+    if (!allSizeMap) {
+      allSizeMap = new Map();
+      allByVariety.set(variety, allSizeMap);
     }
-
-    sizes.sort((a, b) => a.size.localeCompare(b.size));
-    result.push({ variety, quantity, sizes });
+    allSizeMap.set(size, (allSizeMap.get(size) ?? 0) + row.quantity);
   }
 
-  result.sort((a, b) => a.variety.localeCompare(b.variety));
+  const result: OutgoingShedSummaryGroup[] = [
+    { shed: 'all', varieties: buildVarietyRowsFromSizeMaps(allByVariety) },
+  ];
+
+  const shedNames = [...byShed.keys()].sort((a, b) => a.localeCompare(b));
+  for (const shed of shedNames) {
+    result.push({
+      shed,
+      varieties: buildVarietyRowsFromSizeMaps(byShed.get(shed)!),
+    });
+  }
 
   logger?.info(
-    { coldStorageId, varietyCount: result.length },
+    {
+      coldStorageId,
+      shedCount: shedNames.length,
+      varietyCount: allByVariety.size,
+    },
     'Outgoing shed summary computed'
   );
 
