@@ -95,6 +95,8 @@ export const createOutgoingGatePassSchema = z
 
     owner: z.string().trim().optional(),
 
+    shed: z.string().trim().optional(),
+
     billNumber: z.coerce
       .number()
       .int('Bill number must be an integer')
@@ -299,6 +301,9 @@ export const updateOutgoingGatePassBodySchema = z
       .optional(),
     owner: z
       .union([z.string().trim().min(1, 'Owner must be non-empty'), z.null()])
+      .optional(),
+    shed: z
+      .union([z.string().trim().min(1, 'Shed must be non-empty'), z.null()])
       .optional(),
     remarks: z
       .string()

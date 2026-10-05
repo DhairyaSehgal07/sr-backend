@@ -71,6 +71,7 @@ export interface IOutgoingGatePass extends Document {
   driverName?: string;
   driverMobile?: string;
   owner?: string;
+  shed?: string;
 
   billNumber?: number;
   biltiNumber?: number;
@@ -328,6 +329,11 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
     },
 
     owner: {
+      type: String,
+      trim: true,
+    },
+
+    shed: {
       type: String,
       trim: true,
     },

@@ -98,6 +98,7 @@ const OUTGOING_GATE_PASS_EDITABLE_FIELDS = [
   'driverName',
   'driverMobile',
   'owner',
+  'shed',
   'remarks',
   'billNumber',
   'biltiNumber',
@@ -117,6 +118,7 @@ const OUTGOING_GATE_PASS_NULLABLE_UPDATE_FIELDS = [
   'driverName',
   'driverMobile',
   'owner',
+  'shed',
   'billNumber',
   'biltiNumber',
   'billBook',
@@ -1040,6 +1042,7 @@ export async function createOutgoingGatePass(
           ...(payload.driverName && { driverName: payload.driverName }),
           ...(payload.driverMobile && { driverMobile: payload.driverMobile }),
           ...(payload.owner && { owner: payload.owner }),
+          ...(payload.shed && { shed: payload.shed }),
           ...(payload.billNumber !== undefined && {
             billNumber: payload.billNumber,
           }),
