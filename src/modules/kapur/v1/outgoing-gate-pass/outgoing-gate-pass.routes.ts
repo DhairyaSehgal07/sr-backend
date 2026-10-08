@@ -310,7 +310,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag, pre-sowing-treatment. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag, pre-sowing-treatment. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, from, to, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. A blank string for from or to also clears that field. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Update outgoing gate pass',
         params: {
@@ -336,8 +336,14 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
               format: 'date-time',
               description: 'Gate pass date',
             },
-            from: { type: 'string', description: 'Origin' },
-            to: { type: 'string', description: 'Destination' },
+            from: {
+              type: ['string', 'null'],
+              description: 'Origin. Pass null or a blank string to clear.',
+            },
+            to: {
+              type: ['string', 'null'],
+              description: 'Destination. Pass null or a blank string to clear.',
+            },
             truckNumber: {
               type: 'string',
               description: 'Truck number',

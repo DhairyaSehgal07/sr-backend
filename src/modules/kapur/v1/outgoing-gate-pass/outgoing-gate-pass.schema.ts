@@ -253,6 +253,14 @@ export const updateOutgoingGatePassParamsSchema = z.object({
     ),
 });
 
+/** Blank strings clear the field, matching an explicit null. */
+const optionalClearableString = (max: number) =>
+  z.preprocess(
+    (value) =>
+      typeof value === 'string' && value.trim() === '' ? null : value,
+    z.union([z.string().trim().min(1).max(max), z.null()]).optional()
+  );
+
 export const updateOutgoingGatePassBodySchema = z
   .object({
     manualGatePassNumber: z
@@ -265,12 +273,8 @@ export const updateOutgoingGatePassBodySchema = z
       ])
       .optional(),
     date: z.coerce.date().optional(),
-    from: z
-      .union([z.string().trim().min(1, 'From is required').max(200), z.null()])
-      .optional(),
-    to: z
-      .union([z.string().trim().min(1, 'To is required').max(200), z.null()])
-      .optional(),
+    from: optionalClearableString(200),
+    to: optionalClearableString(200),
     truckNumber: z
       .union([
         z.string().trim().max(50, 'Truck number must not exceed 50 characters'),
