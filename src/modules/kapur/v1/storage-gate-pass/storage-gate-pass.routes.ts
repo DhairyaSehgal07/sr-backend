@@ -66,6 +66,10 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
               type: 'string',
               description: 'Optional stage',
             },
+            customMarka: {
+              type: 'string',
+              description: 'Optional custom marka',
+            },
             bagSizes: {
               type: 'array',
               items: { type: 'object', additionalProperties: true },
@@ -593,7 +597,7 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
       schema: {
         ...updateStorageGatePassSchema,
         description:
-          'Update a storage gate pass. Allowed fields: manualGatePassNumber, date, farmerStorageLinkId, variety, storageCategory, generation, stage, bagSizes (size, currentQuantity, initialQuantity, bagType, chamber, floor, row), remarks. gatePassNo cannot be changed. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update a storage gate pass. Allowed fields: manualGatePassNumber, date, farmerStorageLinkId, variety, storageCategory, generation, stage, customMarka, bagSizes (size, currentQuantity, initialQuantity, bagType, chamber, floor, row), remarks. gatePassNo cannot be changed. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Storage Gate Pass'],
         summary: 'Update storage gate pass',
         params: {
@@ -617,6 +621,7 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
             storageCategory: { type: 'string' },
             generation: { type: 'string' },
             stage: { type: 'string' },
+            customMarka: { type: 'string' },
             bagSizes: {
               type: 'array',
               items: {

@@ -860,6 +860,9 @@ export async function createTransferStockGatePass(
             manualGatePassNumber: payload.manualGatePassNumber,
           }),
           ...(payload.stage !== undefined && { stage: payload.stage }),
+          ...(payload.customMarka !== undefined && {
+            customMarka: payload.customMarka,
+          }),
           bagSizes: destinationBagSizes,
           editHistory: [],
           remarks: payload.remarks,

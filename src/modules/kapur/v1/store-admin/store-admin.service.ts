@@ -530,6 +530,7 @@ function daybookStorageProjectStage(): mongoose.PipelineStage {
       variety: 1,
       storageCategory: 1,
       stage: 1,
+      customMarka: 1,
       bagSizes: {
         $sortArray: {
           input: { $ifNull: ['$bagSizes', []] },

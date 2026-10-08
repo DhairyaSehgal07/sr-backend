@@ -4,6 +4,7 @@ import {
   cancelOutgoingGatePass,
   updateOutgoingGatePass,
   getOutgoingShedSummary,
+  getOutgoingGatePassReport,
 } from './outgoing-gate-pass.service.js';
 import {
   createOutgoingGatePassSchema,
@@ -14,6 +15,7 @@ import {
   updateOutgoingGatePassBodySchema,
   UpdateOutgoingGatePassParams,
   UpdateOutgoingGatePassInput,
+  GetOutgoingGatePassReportQuery,
 } from './outgoing-gate-pass.schema.js';
 import {
   AppError,
@@ -321,6 +323,63 @@ export async function getOutgoingShedSummaryHandler(
     request.log.error(
       { error, query: request.query },
       'Error in getOutgoingShedSummaryHandler'
+    );
+
+    if (error instanceof UnauthorizedError) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: { code: error.code, message: error.message },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: { code: error.code, message: error.message },
+      });
+    }
+
+    if (error instanceof AppError) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: { code: error.code, message: error.message },
+      });
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Handler for retrieving all outgoing gate passes for report export (no pagination).
+ * Supports optional dateFrom and dateTo filters (inclusive date range).
+ */
+export async function getOutgoingGatePassReportHandler(
+  request: FastifyRequest<{
+    Querystring: GetOutgoingGatePassReportQuery;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const coldStorageId = getColdStorageIdFromRequest(request);
+    const { dateFrom, dateTo } = request.query;
+
+    const result = await getOutgoingGatePassReport(
+      coldStorageId,
+      { dateFrom, dateTo },
+      request.log
+    );
+
+    return reply.send({
+      success: true,
+      data: {
+        outgoingGatePasses: result.outgoingGatePasses,
+      },
+    });
+  } catch (error) {
+    request.log.error(
+      { error, query: request.query },
+      'Error in getOutgoingGatePassReportHandler'
     );
 
     if (error instanceof UnauthorizedError) {

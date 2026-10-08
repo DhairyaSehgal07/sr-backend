@@ -375,3 +375,88 @@ export type UpdateOutgoingGatePassParams = z.infer<
 export type UpdateOutgoingGatePassInput = z.infer<
   typeof updateOutgoingGatePassBodySchema
 >;
+
+/** Query schema for outgoing gate pass report (date range only, no pagination) */
+export const getOutgoingGatePassReportSchema = z.object({
+  querystring: z.object({
+    dateFrom: z
+      .string()
+      .trim()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}$/,
+        'dateFrom must be an ISO date, e.g. 2026-03-01'
+      )
+      .optional(),
+    dateTo: z
+      .string()
+      .trim()
+      .regex(
+        /^\d{4}-\d{2}-\d{2}$/,
+        'dateTo must be an ISO date, e.g. 2026-03-07'
+      )
+      .optional(),
+  }),
+});
+
+export type GetOutgoingGatePassReportQuery = z.infer<
+  typeof getOutgoingGatePassReportSchema
+>['querystring'];
+
+export interface OutgoingReportOrderDetail {
+  size: string;
+  bagType: string;
+  quantityIssued: number;
+  quantityAvailable: number;
+  weightInKg: number;
+  chamber: string;
+  floor: string;
+  row: string;
+}
+
+export interface OutgoingReportFarmerStorageLink {
+  _id: string;
+  accountNumber?: number;
+  farmerId?: {
+    _id: string;
+    accountNumber?: number;
+    name: string;
+    address: string;
+  };
+}
+
+export interface OutgoingReportCreatedBy {
+  _id: string;
+  name: string;
+}
+
+/** Flat row shape for GET /outgoing-gate-pass/report */
+export interface OutgoingReport {
+  _id: string;
+  farmerStorageLinkId: OutgoingReportFarmerStorageLink;
+  createdBy?: OutgoingReportCreatedBy;
+  gatePassNo: number;
+  manualGatePassNumber?: number;
+  date: string;
+  variety: string;
+  from?: string;
+  to?: string;
+  truckNumber?: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
+  shed?: string;
+  billNumber?: number;
+  biltiNumber?: number;
+  billBook?: string;
+  billBookId?: string;
+  biltiBook?: string;
+  category?: string;
+  costPerBag?: number;
+  orderDetails: OutgoingReportOrderDetail[];
+  totalBags: number;
+  remarks?: string;
+  'pre-sowing-treatment': boolean;
+  status: 'ACTIVE' | 'CANCELLED';
+}

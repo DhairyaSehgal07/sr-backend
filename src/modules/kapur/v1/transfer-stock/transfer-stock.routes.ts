@@ -297,6 +297,11 @@ export async function transferStockRoutes(fastify: FastifyInstance) {
                 'Storage category for the destination storage gate pass',
             },
             stage: { type: 'string', description: 'Optional stage' },
+            customMarka: {
+              type: 'string',
+              description:
+                'Optional custom marka for the destination storage gate pass',
+            },
             from: {
               type: 'string',
               description: 'Origin label for the outgoing gate pass',

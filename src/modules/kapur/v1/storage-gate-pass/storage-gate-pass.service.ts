@@ -32,6 +32,7 @@ const STORAGE_GATE_PASS_EDITABLE_FIELDS = [
   'variety',
   'storageCategory',
   'stage',
+  'customMarka',
   'bagSizes',
   'remarks',
 ] as const;
@@ -171,6 +172,7 @@ type StorageGatePassReportLean = {
   variety: string;
   storageCategory: string;
   stage?: string;
+  customMarka?: string;
   bagSizes?: Array<{
     size: string;
     currentQuantity: number;
@@ -235,6 +237,10 @@ function mapStorageGatePassToReport(
 
   if (pass.stage != null) {
     report.stage = pass.stage;
+  }
+
+  if (pass.customMarka != null) {
+    report.customMarka = pass.customMarka;
   }
 
   if (pass.remarks != null) {
@@ -447,6 +453,7 @@ async function createSingleStorageGatePass(
     variety,
     storageCategory,
     stage,
+    customMarka,
     remarks,
     idempotencyKey,
     farmerStorageLinkId,
@@ -507,6 +514,7 @@ async function createSingleStorageGatePass(
     variety,
     storageCategory,
     ...(stage !== undefined && { stage }),
+    ...(customMarka !== undefined && { customMarka }),
     bagSizes: bagSizes.map((bs) => ({
       size: bs.size,
       currentQuantity: bs.currentQuantity,
@@ -892,7 +900,7 @@ export async function getStorageGatePassReport(
 ======================= */
 
 const STORAGE_SEARCH_SELECT =
-  '_id farmerStorageLinkId createdBy gatePassNo manualGatePassNumber date variety storageCategory stage bagSizes remarks createdAt';
+  '_id farmerStorageLinkId createdBy gatePassNo manualGatePassNumber date variety storageCategory stage customMarka bagSizes remarks createdAt';
 
 const OUTGOING_SEARCH_SELECT =
   '_id farmerStorageLinkId createdBy gatePassNo manualGatePassNumber date variety from to truckNumber transportCompany LSNumber driverName driverMobile owner shed billNumber biltiNumber billBook billBookId dispatchLedgerId biltiBook category costPerBag orderDetails storageGatePassSnapshots remarks status createdAt';
@@ -1272,7 +1280,8 @@ export async function getStorageGatePassAuditsByColdStorage(
       StorageGatePassAudit.find(filter)
         .populate({
           path: 'storageGatePassId',
-          select: 'gatePassNo manualGatePassNumber farmerStorageLinkId stage',
+          select:
+            'gatePassNo manualGatePassNumber farmerStorageLinkId stage customMarka',
           populate: {
             path: 'farmerStorageLinkId',
             select: 'accountNumber farmerId',

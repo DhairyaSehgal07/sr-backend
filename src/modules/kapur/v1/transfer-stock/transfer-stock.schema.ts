@@ -85,6 +85,12 @@ export const createTransferStockSchema = z.object({
     .max(200, 'Stage must not exceed 200 characters')
     .optional(),
 
+  customMarka: z
+    .string()
+    .trim()
+    .max(200, 'Custom marka must not exceed 200 characters')
+    .optional(),
+
   from: z.string().trim().min(1, 'From is required').max(200),
   to: z.string().trim().min(1, 'To is required').max(200),
 

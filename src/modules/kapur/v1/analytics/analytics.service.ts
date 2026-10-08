@@ -1411,6 +1411,7 @@ export async function getStorageGatePassReport(
       date: p.date,
       variety: p.variety,
       storageCategory: p.storageCategory,
+      customMarka: p.customMarka,
       bagSizes: p.bagSizes,
       remarks: p.remarks,
       farmer: link?.farmerId

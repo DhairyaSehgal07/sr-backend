@@ -17,6 +17,7 @@ import { FarmerStorageLink } from '../farmer-storage-link/farmer-storage-link.mo
 import type {
   CancelOutgoingGatePassInput,
   CreateOutgoingGatePassInput,
+  OutgoingReport,
   UpdateOutgoingGatePassInput,
 } from './outgoing-gate-pass.schema.js';
 import { DIRECT_SALE_CATEGORY } from './outgoing-gate-pass.schema.js';
@@ -1641,4 +1642,304 @@ export async function getOutgoingShedSummary(
   );
 
   return result;
+}
+
+export interface GetOutgoingGatePassReportOptions {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+function toObjectIdString(value: unknown): string {
+  if (value instanceof mongoose.Types.ObjectId) {
+    return value.toString();
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return '';
+}
+
+function formatReportDateTime(date: Date | string | undefined): string {
+  if (date == null) {
+    return '';
+  }
+  const parsed = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return '';
+  }
+  return parsed.toISOString();
+}
+
+type OutgoingGatePassReportLean = {
+  _id?: unknown;
+  farmerStorageLinkId?: {
+    _id?: unknown;
+    accountNumber?: number;
+    farmerId?: {
+      _id?: unknown;
+      name?: string;
+      address?: string;
+    } | null;
+  } | null;
+  createdBy?: {
+    _id?: unknown;
+    name?: string;
+  } | null;
+  gatePassNo: number;
+  manualGatePassNumber?: number;
+  date?: Date | string;
+  variety: string;
+  from?: string;
+  to?: string;
+  truckNumber?: string;
+  transportCompany?: string;
+  LSNumber?: string;
+  driverName?: string;
+  driverMobile?: string;
+  owner?: string;
+  shed?: string;
+  billNumber?: number;
+  biltiNumber?: number;
+  billBook?: string;
+  billBookId?: unknown;
+  biltiBook?: string;
+  category?: string;
+  costPerBag?: number;
+  orderDetails?: Array<{
+    size: string;
+    bagType: string;
+    quantityIssued: number;
+    quantityAvailable: number;
+    weightInKg: number;
+    chamber: string;
+    floor: string;
+    row: string;
+  }>;
+  remarks?: string;
+  'pre-sowing-treatment'?: boolean;
+  status: 'ACTIVE' | 'CANCELLED';
+};
+
+function mapOutgoingGatePassToReport(
+  pass: OutgoingGatePassReportLean
+): OutgoingReport {
+  const farmerStorageLink: OutgoingReport['farmerStorageLinkId'] = {
+    _id: toObjectIdString(pass.farmerStorageLinkId?._id),
+  };
+
+  if (pass.farmerStorageLinkId?.accountNumber != null) {
+    farmerStorageLink.accountNumber = pass.farmerStorageLinkId.accountNumber;
+  }
+
+  if (pass.farmerStorageLinkId?.farmerId) {
+    farmerStorageLink.farmerId = {
+      _id: toObjectIdString(pass.farmerStorageLinkId.farmerId._id),
+      ...(pass.farmerStorageLinkId.accountNumber != null && {
+        accountNumber: pass.farmerStorageLinkId.accountNumber,
+      }),
+      name: pass.farmerStorageLinkId.farmerId.name ?? '',
+      address: pass.farmerStorageLinkId.farmerId.address ?? '',
+    };
+  }
+
+  const orderDetails = pass.orderDetails ?? [];
+  const totalBags = orderDetails.reduce(
+    (total, line) => total + (line.quantityIssued ?? 0),
+    0
+  );
+
+  const report: OutgoingReport = {
+    _id: toObjectIdString(pass._id),
+    farmerStorageLinkId: farmerStorageLink,
+    gatePassNo: pass.gatePassNo,
+    date: formatReportDateTime(pass.date),
+    variety: pass.variety,
+    orderDetails,
+    totalBags,
+    'pre-sowing-treatment': pass['pre-sowing-treatment'] ?? false,
+    status: pass.status,
+  };
+
+  if (pass.createdBy) {
+    report.createdBy = {
+      _id: toObjectIdString(pass.createdBy._id),
+      name: pass.createdBy.name ?? '',
+    };
+  }
+
+  if (pass.manualGatePassNumber != null) {
+    report.manualGatePassNumber = pass.manualGatePassNumber;
+  }
+
+  if (pass.from != null && pass.from !== '') {
+    report.from = pass.from;
+  }
+
+  if (pass.to != null && pass.to !== '') {
+    report.to = pass.to;
+  }
+
+  if (pass.truckNumber != null && pass.truckNumber !== '') {
+    report.truckNumber = pass.truckNumber;
+  }
+
+  if (pass.transportCompany != null && pass.transportCompany !== '') {
+    report.transportCompany = pass.transportCompany;
+  }
+
+  if (pass.LSNumber != null && pass.LSNumber !== '') {
+    report.LSNumber = pass.LSNumber;
+  }
+
+  if (pass.driverName != null && pass.driverName !== '') {
+    report.driverName = pass.driverName;
+  }
+
+  if (pass.driverMobile != null && pass.driverMobile !== '') {
+    report.driverMobile = pass.driverMobile;
+  }
+
+  if (pass.owner != null && pass.owner !== '') {
+    report.owner = pass.owner;
+  }
+
+  if (pass.shed != null && pass.shed !== '') {
+    report.shed = pass.shed;
+  }
+
+  if (pass.billNumber != null) {
+    report.billNumber = pass.billNumber;
+  }
+
+  if (pass.biltiNumber != null) {
+    report.biltiNumber = pass.biltiNumber;
+  }
+
+  if (pass.billBook != null && pass.billBook !== '') {
+    report.billBook = pass.billBook;
+  }
+
+  if (pass.billBookId != null) {
+    const billBookId = toObjectIdString(pass.billBookId);
+    if (billBookId) {
+      report.billBookId = billBookId;
+    }
+  }
+
+  if (pass.biltiBook != null && pass.biltiBook !== '') {
+    report.biltiBook = pass.biltiBook;
+  }
+
+  if (pass.category != null && pass.category !== '') {
+    report.category = pass.category;
+  }
+
+  if (pass.costPerBag != null) {
+    report.costPerBag = pass.costPerBag;
+  }
+
+  if (pass.remarks != null && pass.remarks !== '') {
+    report.remarks = pass.remarks;
+  }
+
+  return report;
+}
+
+/**
+ * Retrieves all outgoing gate passes for a cold storage within an optional date range (no pagination).
+ */
+export async function getOutgoingGatePassReport(
+  coldStorageId: string,
+  options: GetOutgoingGatePassReportOptions = {},
+  logger?: FastifyBaseLogger
+): Promise<{ outgoingGatePasses: OutgoingReport[] }> {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
+      throw new ValidationError(
+        'Invalid cold storage ID format',
+        'INVALID_COLD_STORAGE_ID'
+      );
+    }
+
+    const coldStorageObjectId = new mongoose.Types.ObjectId(coldStorageId);
+    const farmerStorageLinkIds = await FarmerStorageLink.find({
+      coldStorageId: coldStorageObjectId,
+    })
+      .distinct('_id')
+      .lean();
+
+    const filter: Record<string, unknown> = {
+      farmerStorageLinkId: { $in: farmerStorageLinkIds },
+    };
+
+    if (options.dateFrom != null || options.dateTo != null) {
+      const dateConditions: Record<string, unknown> = {};
+      if (options.dateFrom != null) {
+        const from = new Date(options.dateFrom);
+        if (Number.isNaN(from.getTime())) {
+          throw new ValidationError(
+            'Invalid dateFrom format. Use ISO date, e.g. 2026-03-01',
+            'INVALID_DATE_FROM'
+          );
+        }
+        from.setUTCHours(0, 0, 0, 0);
+        dateConditions.$gte = from;
+      }
+      if (options.dateTo != null) {
+        const to = new Date(options.dateTo);
+        if (Number.isNaN(to.getTime())) {
+          throw new ValidationError(
+            'Invalid dateTo format. Use ISO date, e.g. 2026-03-07',
+            'INVALID_DATE_TO'
+          );
+        }
+        to.setUTCHours(23, 59, 59, 999);
+        dateConditions.$lte = to;
+      }
+      filter.date = dateConditions;
+    }
+
+    const outgoingGatePasses = await OutgoingGatePass.find(filter)
+      .populate({
+        path: 'farmerStorageLinkId',
+        select: 'accountNumber farmerId',
+        populate: { path: 'farmerId', select: 'name address' },
+      })
+      .populate('createdBy', 'name')
+      .sort({ gatePassNo: -1, date: -1 })
+      .lean();
+
+    logger?.info(
+      {
+        coldStorageId,
+        count: outgoingGatePasses.length,
+        dateFrom: options.dateFrom,
+        dateTo: options.dateTo,
+      },
+      'Retrieved outgoing gate pass report'
+    );
+
+    return {
+      outgoingGatePasses: (
+        outgoingGatePasses as unknown as OutgoingGatePassReportLean[]
+      ).map(mapOutgoingGatePassToReport),
+    };
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+
+    logger?.error(
+      { error, coldStorageId },
+      'Error retrieving outgoing gate pass report'
+    );
+
+    throw new AppError(
+      'Failed to retrieve outgoing gate pass report',
+      500,
+      'GET_OUTGOING_GATE_PASS_REPORT_ERROR'
+    );
+  }
 }
