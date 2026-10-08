@@ -4,15 +4,12 @@ import {
   OutgoingGatePass,
   OutgoingGatePassStatus,
   type IOutgoingOrderDetail,
-  type IOutgoingStorageGatePassSnapshot,
 } from './outgoing-gate-pass.model.js';
 import {
   OutgoingGatePassAudit,
   OutgoingGatePassAuditAction,
   type OutgoingGatePassAuditState,
 } from './outgoing-gate-pass-audit.model.js';
-import { StorageGatePass } from '../storage-gate-pass/storage-gate-pass.model.js';
-import type { BagType } from '../storage-gate-pass/storage-gate-pass.model.js';
 import { FarmerStorageLink } from '../farmer-storage-link/farmer-storage-link.model.js';
 import type {
   CancelOutgoingGatePassInput,
@@ -30,62 +27,6 @@ import {
   ValidationError,
   AppError,
 } from '../../../../utils/errors.js';
-
-/* =======================
-   TYPES (internal)
-======================= */
-
-interface OutgoingValidatedAllocation {
-  storageGatePassId: string;
-  size: string;
-  quantityToAllocate: number;
-  weightInKg: number;
-  chamber: string;
-  floor: string;
-  row: string;
-}
-
-export interface OutgoingStoragePassWithFilteredAllocations {
-  storageGatePassId: string;
-  allocations: OutgoingValidatedAllocation[];
-}
-
-type StoragePassLean = {
-  _id: Types.ObjectId;
-  farmerStorageLinkId: Types.ObjectId;
-  gatePassNo: number;
-  variety: string;
-  storageCategory: string;
-  bagSizes: Array<{
-    size: string;
-    currentQuantity: number;
-    initialQuantity: number;
-    bagType: BagType;
-    chamber: string;
-    floor: string;
-    row: string;
-  }>;
-};
-
-function allocationLineKey(
-  size: string,
-  bagType: BagType,
-  chamber: string,
-  floor: string,
-  row: string,
-  weightInKg: number
-): string {
-  return `${size}|${bagType}|${chamber}|${floor}|${row}|${weightInKg}`;
-}
-
-function bagLineKey(
-  size: string,
-  chamber: string,
-  floor: string,
-  row: string
-): string {
-  return `${size}|${chamber}|${floor}|${row}`;
-}
 
 const OUTGOING_GATE_PASS_EDITABLE_FIELDS = [
   'manualGatePassNumber',
@@ -178,46 +119,31 @@ function buildOutgoingGatePassAuditDiff(
 }
 
 /* =======================
-   INPUT VALIDATION
+   ORDER DETAILS
 ======================= */
 
-export function validateOutgoingGatePassInput(
-  payload: CreateOutgoingGatePassInput,
-  logger?: FastifyBaseLogger
-): OutgoingStoragePassWithFilteredAllocations[] {
-  const result: OutgoingStoragePassWithFilteredAllocations[] = [];
+function buildOrderDetails(
+  payload: CreateOutgoingGatePassInput
+): IOutgoingOrderDetail[] {
+  const lines = payload.orderDetails.filter((line) => line.quantity > 0);
 
-  for (const sp of payload.storageGatePasses) {
-    const nonZeroAllocations = sp.allocations.filter(
-      (a) => a.quantityToAllocate > 0
+  if (lines.length === 0) {
+    throw new ValidationError(
+      'At least one order detail must have quantity greater than zero',
+      'INVALID_ALLOCATION_QUANTITY'
     );
-
-    if (nonZeroAllocations.length === 0) {
-      logger?.warn(
-        { storageGatePassId: sp.storageGatePassId },
-        'All allocations have zero quantity'
-      );
-      throw new ValidationError(
-        `Storage gate pass ${sp.storageGatePassId}: at least one allocation must have quantity > 0`,
-        'INVALID_ALLOCATION_QUANTITY'
-      );
-    }
-
-    result.push({
-      storageGatePassId: sp.storageGatePassId,
-      allocations: nonZeroAllocations.map((a) => ({
-        storageGatePassId: sp.storageGatePassId,
-        size: a.size,
-        quantityToAllocate: a.quantityToAllocate,
-        weightInKg: a.weightInKg,
-        chamber: a.chamber,
-        floor: a.floor,
-        row: a.row,
-      })),
-    });
   }
 
-  return result;
+  return lines.map((line) => ({
+    size: line.size,
+    bagType: line.bagType,
+    quantityIssued: line.quantity,
+    quantityAvailable: line.quantity,
+    weightInKg: line.weightInKg,
+    chamber: line.chamber,
+    floor: line.floor,
+    row: line.row,
+  }));
 }
 
 /* =======================
@@ -322,315 +248,6 @@ async function validateReplacesOutgoingGatePass(
       'REPLACES_PASS_LINK_MISMATCH'
     );
   }
-}
-
-/* =======================
-   FETCH & VALIDATE STORAGE GATE PASSES
-======================= */
-
-export async function fetchAndValidateStorageGatePasses(
-  payload: CreateOutgoingGatePassInput,
-  validated: OutgoingStoragePassWithFilteredAllocations[],
-  farmerStorageLinkObjectId: Types.ObjectId,
-  session: ClientSession,
-  _logger?: FastifyBaseLogger
-): Promise<Map<string, StoragePassLean>> {
-  const storageGatePassIds = validated.map(
-    (v) => new Types.ObjectId(v.storageGatePassId)
-  );
-
-  const fetched = await StorageGatePass.find({
-    _id: { $in: storageGatePassIds },
-  })
-    .session(session)
-    .lean();
-
-  if (fetched.length !== storageGatePassIds.length) {
-    const foundIds = new Set(
-      fetched.map((f) => (f as { _id: Types.ObjectId })._id.toString())
-    );
-    const missingIds = storageGatePassIds
-      .filter((id) => !foundIds.has(id.toString()))
-      .map((id) => id.toString());
-    throw new NotFoundError(
-      `Storage gate pass(es) not found: ${missingIds.join(', ')}`,
-      'STORAGE_GATE_PASS_NOT_FOUND'
-    );
-  }
-
-  const storagePassMap = new Map<string, StoragePassLean>();
-  for (const sp of fetched) {
-    const s = sp as StoragePassLean;
-    storagePassMap.set(s._id.toString(), s);
-  }
-
-  const expectedVariety = payload.variety.trim();
-  const expectedLinkId = farmerStorageLinkObjectId.toString();
-
-  for (const item of validated) {
-    const storagePass = storagePassMap.get(item.storageGatePassId);
-    if (!storagePass) continue;
-
-    if (storagePass.farmerStorageLinkId.toString() !== expectedLinkId) {
-      throw new ValidationError(
-        `Storage gate pass ${item.storageGatePassId} does not belong to the specified farmer storage link`,
-        'STORAGE_PASS_FARMER_LINK_MISMATCH'
-      );
-    }
-
-    const spVariety = storagePass.variety?.trim();
-    if (spVariety !== expectedVariety) {
-      throw new ValidationError(
-        `Variety mismatch for storage gate pass ${item.storageGatePassId}: expected "${expectedVariety}", got "${spVariety}"`,
-        'VARIETY_MISMATCH'
-      );
-    }
-
-    for (const alloc of item.allocations) {
-      const detail = storagePass.bagSizes.find(
-        (d) =>
-          d.size === alloc.size &&
-          d.chamber === alloc.chamber &&
-          d.floor === alloc.floor &&
-          d.row === alloc.row
-      );
-      if (!detail) {
-        throw new ValidationError(
-          `No matching bag size for size "${alloc.size}" at ${alloc.chamber}/${alloc.floor}/${alloc.row} in storage gate pass ${item.storageGatePassId}`,
-          'SIZE_LOCATION_NOT_FOUND'
-        );
-      }
-      if (detail.currentQuantity < alloc.quantityToAllocate) {
-        throw new ValidationError(
-          `Insufficient quantity for size "${alloc.size}" at ${alloc.chamber}/${alloc.floor}/${alloc.row} in storage gate pass ${item.storageGatePassId}: available ${detail.currentQuantity}, requested ${alloc.quantityToAllocate}`,
-          'INSUFFICIENT_STOCK'
-        );
-      }
-    }
-  }
-
-  return storagePassMap;
-}
-
-/* =======================
-   BULK OPERATIONS
-======================= */
-
-export function prepareBulkOperationsForOutgoing(
-  validated: OutgoingStoragePassWithFilteredAllocations[]
-): mongoose.mongo.AnyBulkWriteOperation<typeof StorageGatePass.prototype>[] {
-  const bulkOps: Array<{
-    updateOne: {
-      filter: Record<string, unknown>;
-      update: Record<string, unknown>;
-      arrayFilters?: Array<Record<string, unknown>>;
-    };
-  }> = [];
-
-  for (const item of validated) {
-    for (const alloc of item.allocations) {
-      bulkOps.push({
-        updateOne: {
-          filter: { _id: new Types.ObjectId(item.storageGatePassId) },
-          update: {
-            $inc: {
-              'bagSizes.$[elem].currentQuantity': -alloc.quantityToAllocate,
-            },
-          },
-          arrayFilters: [
-            {
-              'elem.size': alloc.size,
-              'elem.chamber': alloc.chamber,
-              'elem.floor': alloc.floor,
-              'elem.row': alloc.row,
-              'elem.currentQuantity': { $gte: alloc.quantityToAllocate },
-            },
-          ],
-        },
-      });
-    }
-  }
-
-  return bulkOps as mongoose.mongo.AnyBulkWriteOperation<
-    typeof StorageGatePass.prototype
-  >[];
-}
-
-function prepareBulkOperationsForCancelRestore(
-  snapshots: IOutgoingStorageGatePassSnapshot[]
-): mongoose.mongo.AnyBulkWriteOperation<typeof StorageGatePass.prototype>[] {
-  const bulkOps: Array<{
-    updateOne: {
-      filter: Record<string, unknown>;
-      update: Record<string, unknown>;
-      arrayFilters?: Array<Record<string, unknown>>;
-    };
-  }> = [];
-
-  for (const snapshot of snapshots) {
-    for (const bag of snapshot.bagSizes) {
-      if (bag.quantityIssued <= 0) continue;
-
-      bulkOps.push({
-        updateOne: {
-          filter: { _id: snapshot._id },
-          update: {
-            $inc: {
-              'bagSizes.$[elem].currentQuantity': bag.quantityIssued,
-            },
-          },
-          arrayFilters: [
-            {
-              'elem.size': bag.size,
-              'elem.bagType': bag.bagType,
-              'elem.chamber': bag.chamber,
-              'elem.floor': bag.floor,
-              'elem.row': bag.row,
-            },
-          ],
-        },
-      });
-    }
-  }
-
-  return bulkOps as mongoose.mongo.AnyBulkWriteOperation<
-    typeof StorageGatePass.prototype
-  >[];
-}
-
-/* =======================
-   BUILD ORDER DETAILS & SNAPSHOTS
-======================= */
-
-function buildOrderDetails(
-  validated: OutgoingStoragePassWithFilteredAllocations[],
-  storagePassMap: Map<string, StoragePassLean>
-): IOutgoingOrderDetail[] {
-  const aggregated = new Map<
-    string,
-    IOutgoingOrderDetail & { quantityIssued: number }
-  >();
-
-  for (const item of validated) {
-    const sp = storagePassMap.get(item.storageGatePassId);
-    if (!sp) continue;
-
-    for (const alloc of item.allocations) {
-      const detail = sp.bagSizes.find(
-        (d) =>
-          d.size === alloc.size &&
-          d.chamber === alloc.chamber &&
-          d.floor === alloc.floor &&
-          d.row === alloc.row
-      );
-      if (!detail) continue;
-
-      const key = allocationLineKey(
-        alloc.size,
-        detail.bagType,
-        alloc.chamber,
-        alloc.floor,
-        alloc.row,
-        alloc.weightInKg
-      );
-      const remaining = Math.max(
-        0,
-        detail.currentQuantity - alloc.quantityToAllocate
-      );
-
-      const existing = aggregated.get(key);
-      if (existing) {
-        existing.quantityIssued += alloc.quantityToAllocate;
-        existing.quantityAvailable = remaining;
-      } else {
-        aggregated.set(key, {
-          size: alloc.size,
-          bagType: detail.bagType,
-          quantityIssued: alloc.quantityToAllocate,
-          quantityAvailable: remaining,
-          weightInKg: alloc.weightInKg,
-          chamber: alloc.chamber,
-          floor: alloc.floor,
-          row: alloc.row,
-        });
-      }
-    }
-  }
-
-  return Array.from(aggregated.values());
-}
-
-function buildStorageGatePassSnapshots(
-  validated: OutgoingStoragePassWithFilteredAllocations[],
-  storagePassMap: Map<string, StoragePassLean>
-): IOutgoingStorageGatePassSnapshot[] {
-  const snapshots: IOutgoingStorageGatePassSnapshot[] = [];
-
-  for (const item of validated) {
-    const sp = storagePassMap.get(item.storageGatePassId);
-    if (!sp) continue;
-
-    const allocatedByKey = new Map<
-      string,
-      {
-        quantityIssued: number;
-        bagType: BagType;
-        initialQuantity: number;
-        currentQuantityBefore: number;
-      }
-    >();
-
-    for (const alloc of item.allocations) {
-      const detail = sp.bagSizes.find(
-        (d) =>
-          d.size === alloc.size &&
-          d.chamber === alloc.chamber &&
-          d.floor === alloc.floor &&
-          d.row === alloc.row
-      );
-      if (!detail) continue;
-
-      const key = bagLineKey(alloc.size, alloc.chamber, alloc.floor, alloc.row);
-      const existing = allocatedByKey.get(key);
-      if (existing) {
-        existing.quantityIssued += alloc.quantityToAllocate;
-      } else {
-        allocatedByKey.set(key, {
-          quantityIssued: alloc.quantityToAllocate,
-          bagType: detail.bagType,
-          initialQuantity: detail.initialQuantity,
-          currentQuantityBefore: detail.currentQuantity,
-        });
-      }
-    }
-
-    const bagSizes = Array.from(allocatedByKey.entries()).map(([key, data]) => {
-      const [size, chamber, floor, row] = key.split('|');
-      return {
-        size,
-        bagType: data.bagType,
-        chamber,
-        floor,
-        row,
-        initialQuantity: data.initialQuantity,
-        currentQuantity: Math.max(
-          0,
-          data.currentQuantityBefore - data.quantityIssued
-        ),
-        quantityIssued: data.quantityIssued,
-      };
-    });
-
-    snapshots.push({
-      _id: sp._id,
-      gatePassNo: sp.gatePassNo,
-      variety: sp.variety,
-      storageCategory: sp.storageCategory,
-      bagSizes,
-    });
-  }
-
-  return snapshots;
 }
 
 /* =======================
@@ -980,41 +597,7 @@ export async function createOutgoingGatePass(
       );
     }
 
-    const validated = validateOutgoingGatePassInput(payload, logger);
-
-    const storagePassMap = await fetchAndValidateStorageGatePasses(
-      payload,
-      validated,
-      farmerStorageLinkObjectId,
-      session,
-      logger
-    );
-
-    const bulkOps = prepareBulkOperationsForOutgoing(validated);
-    if (bulkOps.length === 0) {
-      throw new ValidationError(
-        'No allocations to apply',
-        'INVALID_ALLOCATION_QUANTITY'
-      );
-    }
-
-    const updateResult = await StorageGatePass.bulkWrite(
-      bulkOps as Parameters<typeof StorageGatePass.bulkWrite>[0],
-      { session }
-    );
-
-    if (updateResult.modifiedCount !== bulkOps.length) {
-      throw new ConflictError(
-        `Expected ${bulkOps.length} updates, got ${updateResult.modifiedCount}. Concurrent modification detected.`,
-        'CONCURRENT_MODIFICATION'
-      );
-    }
-
-    const orderDetails = buildOrderDetails(validated, storagePassMap);
-    const storageGatePassSnapshots = buildStorageGatePassSnapshots(
-      validated,
-      storagePassMap
-    );
+    const orderDetails = buildOrderDetails(payload);
 
     const isDirectSale = payload.category === DIRECT_SALE_CATEGORY;
     const directSaleParty = isDirectSale
@@ -1069,7 +652,6 @@ export async function createOutgoingGatePass(
             'pre-sowing-treatment': payload['pre-sowing-treatment'],
           }),
           orderDetails,
-          storageGatePassSnapshots,
           remarks: payload.remarks,
           status: OutgoingGatePassStatus.ACTIVE,
           ...(payload.replacesOutgoingGatePassId && {
@@ -1282,23 +864,6 @@ export async function cancelOutgoingGatePass(
       );
     }
 
-    const snapshots = outgoing.storageGatePassSnapshots ?? [];
-    const bulkOps = prepareBulkOperationsForCancelRestore(snapshots);
-
-    if (bulkOps.length > 0) {
-      const updateResult = await StorageGatePass.bulkWrite(
-        bulkOps as Parameters<typeof StorageGatePass.bulkWrite>[0],
-        { session }
-      );
-
-      if (updateResult.modifiedCount !== bulkOps.length) {
-        throw new ConflictError(
-          `Expected ${bulkOps.length} stock restores, got ${updateResult.modifiedCount}. Concurrent modification detected.`,
-          'CONCURRENT_MODIFICATION'
-        );
-      }
-    }
-
     const cancelledAt = new Date();
     const outgoingObjectId = new Types.ObjectId(outgoingGatePassId);
 
@@ -1351,7 +916,6 @@ export async function cancelOutgoingGatePass(
       {
         outgoingGatePassId,
         gatePassNo: outgoing.gatePassNo,
-        restoredOperations: bulkOps.length,
       },
       'Outgoing gate pass cancelled successfully'
     );
@@ -1366,90 +930,6 @@ export async function cancelOutgoingGatePass(
   } finally {
     session.endSession();
   }
-}
-
-/* =======================
-   TRANSFER STOCK (outgoing doc only; stock already deducted)
-======================= */
-
-export interface CreateOutgoingGatePassForTransferStockParams {
-  farmerStorageLinkId: Types.ObjectId;
-  gatePassNo: number;
-  date: Date;
-  variety: string;
-  from: string;
-  to: string;
-  truckNumber?: string;
-  remarks?: string;
-  createdById?: string;
-  validated: OutgoingStoragePassWithFilteredAllocations[];
-  storagePassMap: Map<string, StoragePassLean>;
-}
-
-export async function createOutgoingGatePassForTransferStock(
-  session: ClientSession,
-  params: CreateOutgoingGatePassForTransferStockParams
-): Promise<Types.ObjectId> {
-  const orderDetails = buildOrderDetails(
-    params.validated,
-    params.storagePassMap
-  );
-  const storageGatePassSnapshots = buildStorageGatePassSnapshots(
-    params.validated,
-    params.storagePassMap
-  );
-
-  const doc = await OutgoingGatePass.create(
-    [
-      {
-        farmerStorageLinkId: params.farmerStorageLinkId,
-        createdBy: params.createdById
-          ? new Types.ObjectId(params.createdById)
-          : undefined,
-        gatePassNo: params.gatePassNo,
-        date: params.date,
-        variety: params.variety,
-        from: params.from,
-        to: params.to,
-        truckNumber: params.truckNumber ?? '',
-        orderDetails,
-        storageGatePassSnapshots,
-        remarks: params.remarks,
-        category: 'Internal Transfer',
-        status: OutgoingGatePassStatus.ACTIVE,
-      },
-    ],
-    { session }
-  ).then((arr) => arr[0]);
-
-  return doc._id as Types.ObjectId;
-}
-
-export async function recordOutgoingGatePassCreateAudit(
-  outgoingGatePassId: Types.ObjectId,
-  params: {
-    gatePassNo: number;
-    variety: string;
-    date: Date;
-    farmerStorageLinkId: Types.ObjectId;
-    createdById?: string;
-  }
-): Promise<void> {
-  await OutgoingGatePassAudit.create({
-    outgoingGatePassId,
-    action: OutgoingGatePassAuditAction.CREATE,
-    performedById: params.createdById
-      ? new Types.ObjectId(params.createdById)
-      : undefined,
-    previousState: {},
-    modifiedState: {
-      gatePassNo: params.gatePassNo,
-      status: OutgoingGatePassStatus.ACTIVE,
-      farmerStorageLinkId: params.farmerStorageLinkId.toString(),
-      variety: params.variety,
-      date: params.date.toISOString(),
-    },
-  });
 }
 
 /* =======================

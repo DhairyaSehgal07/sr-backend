@@ -16,23 +16,14 @@ import { connectDB } from '../config/database.js';
 import { ColdStorage } from '../modules/kapur/v1/cold-storage/cold-storage.model.js';
 import { Farmer } from '../modules/kapur/v1/farmer/farmer.model.js';
 import { FarmerStorageLink } from '../modules/kapur/v1/farmer-storage-link/farmer-storage-link.model.js';
-import { GradingGatePass } from '../modules/kapur/v1/grading-gate-pass/grading-gate-pass.model.js';
-import { GradingGatePassAudit } from '../modules/kapur/v1/grading-gate-pass/grading-gate-pass-audit.model.js';
-import { IncomingGatePass } from '../modules/kapur/v1/incoming-gate-pass/incoming-gate-pass.model.js';
-import { IncomingGatePassAudit } from '../modules/kapur/v1/incoming-gate-pass/incoming-gate-pass-audit.model.js';
 import { NikasiGatePass } from '../modules/kapur/v1/nikasi-gate-pass/nikasi-gate-pass.model.js';
 import { Preferences } from '../modules/kapur/v1/preferences/preferences.model.js';
 import { RolePermission } from '../modules/kapur/v1/role-permission/role-permission.model.js';
-import { StorageGatePass } from '../modules/kapur/v1/storage-gate-pass/storage-gate-pass.model.js';
-import { EditHistory } from '../modules/kapur/v1/storage-gate-pass/edit-history.model.js';
 import { StoreAdmin } from '../modules/kapur/v1/store-admin/store-admin.model.js';
 import { Temperature } from '../modules/kapur/v1/temperature/temperature.model.js';
 import { DispatchLedger } from '../modules/kapur/v1/dispatch-ledger/dispatch-ledger.model.js';
-import { Booking } from '../modules/kapur/v1/booking/booking.model.js';
-import { BookingAudit } from '../modules/kapur/v1/booking/booking-audit.model.js';
 import { OutgoingGatePass } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.model.js';
 import { OutgoingGatePassAudit } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass-audit.model.js';
-import { TransferStockGatePass } from '../modules/kapur/v1/transfer-stock/transfer-stock.model.js';
 import { BillBook } from '../modules/kapur/v1/bill-book/bill-book.model.js';
 import { FinanceSale } from '../modules/kapur/v1/finances/finance-sale.model.js';
 import { FinanceRecovery } from '../modules/kapur/v1/finances/finance-recovery.model.js';
@@ -42,23 +33,14 @@ const MODELS = [
   ColdStorage,
   Farmer,
   FarmerStorageLink,
-  GradingGatePass,
-  GradingGatePassAudit,
-  IncomingGatePass,
-  IncomingGatePassAudit,
   NikasiGatePass,
   Preferences,
   RolePermission,
-  StorageGatePass,
-  EditHistory,
   StoreAdmin,
   Temperature,
   DispatchLedger,
-  Booking,
-  BookingAudit,
   OutgoingGatePass,
   OutgoingGatePassAudit,
-  TransferStockGatePass,
   BillBook,
   FinanceSale,
   FinanceRecovery,

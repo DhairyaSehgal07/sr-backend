@@ -18,7 +18,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Create a new outgoing gate pass from storage gate pass allocations',
+          'Create a new outgoing gate pass from the submitted order lines',
         tags: ['Outgoing Gate Pass'],
         summary: 'Create outgoing gate pass',
         body: {
@@ -28,7 +28,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             'gatePassNo',
             'date',
             'variety',
-            'storageGatePasses',
+            'orderDetails',
           ],
           properties: {
             farmerStorageLinkId: {
@@ -84,39 +84,28 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
               description:
                 'Cost per bag. Required and greater than zero when category is Direct Sale',
             },
-            storageGatePasses: {
+            orderDetails: {
               type: 'array',
-              description: 'Storage gate passes with allocations',
+              description: 'Bag lines recorded on this dispatch',
               items: {
                 type: 'object',
-                required: ['storageGatePassId', 'allocations'],
+                required: [
+                  'size',
+                  'bagType',
+                  'quantity',
+                  'weightInKg',
+                  'chamber',
+                  'floor',
+                  'row',
+                ],
                 properties: {
-                  storageGatePassId: {
-                    type: 'string',
-                    description: 'Storage gate pass ID',
-                  },
-                  allocations: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      required: [
-                        'size',
-                        'quantityToAllocate',
-                        'weightInKg',
-                        'chamber',
-                        'floor',
-                        'row',
-                      ],
-                      properties: {
-                        size: { type: 'string' },
-                        quantityToAllocate: { type: 'number' },
-                        weightInKg: { type: 'number' },
-                        chamber: { type: 'string' },
-                        floor: { type: 'string' },
-                        row: { type: 'string' },
-                      },
-                    },
-                  },
+                  size: { type: 'string' },
+                  bagType: { type: 'string', enum: ['JUTE', 'LENO'] },
+                  quantity: { type: 'number' },
+                  weightInKg: { type: 'number' },
+                  chamber: { type: 'string' },
+                  floor: { type: 'string' },
+                  row: { type: 'string' },
                 },
               },
             },
@@ -173,7 +162,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             },
           },
           404: {
-            description: 'Storage gate pass or farmer storage link not found',
+            description: 'Farmer storage link not found',
             type: 'object',
             properties: {
               status: { type: 'string' },
@@ -310,7 +299,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag, pre-sowing-treatment. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag, pre-sowing-treatment. gatePassNo, variety, and orderDetails cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Update outgoing gate pass',
         params: {
@@ -471,7 +460,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
       schema: {
         ...cancelOutgoingGatePassParamsSchema,
         description:
-          'Cancel an active outgoing gate pass. Restores bag quantities on linked storage gate passes using the stored snapshots, marks the pass as CANCELLED, and records an audit entry. Pass must belong to the authenticated store admin cold storage.',
+          'Cancel an active outgoing gate pass. Marks the pass as CANCELLED and records an audit entry. Pass must belong to the authenticated store admin cold storage.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Cancel outgoing gate pass',
         params: {

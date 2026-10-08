@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import mongoose from 'mongoose';
+import { BagType } from './outgoing-gate-pass.model.js';
 
-const outgoingAllocationSchema = z.object({
+const orderDetailSchema = z.object({
   size: z.string().trim().min(1, 'Size is required'),
-  quantityToAllocate: z.coerce
-    .number()
-    .int()
-    .min(0, 'Quantity to allocate must be non-negative'),
+  bagType: z.enum(BagType, {
+    message: 'Bag type must be JUTE or LENO',
+  }),
+  quantity: z.coerce.number().int().min(0, 'Quantity must be non-negative'),
   weightInKg: z.coerce
     .number()
     .min(0, 'Weight in kg must be non-negative')
@@ -31,20 +32,6 @@ const objectIdString = (label: string) =>
       (val) => mongoose.Types.ObjectId.isValid(val),
       `Invalid ${label} format`
     );
-
-const outgoingStorageGatePassAllocationSchema = z.object({
-  storageGatePassId: z
-    .string()
-    .trim()
-    .min(1, 'Storage gate pass ID is required')
-    .refine(
-      (val) => mongoose.Types.ObjectId.isValid(val),
-      'Invalid storage gate pass ID format'
-    ),
-  allocations: z
-    .array(outgoingAllocationSchema)
-    .min(1, 'At least one allocation is required'),
-});
 
 export const createOutgoingGatePassSchema = z
   .object({
@@ -137,9 +124,9 @@ export const createOutgoingGatePassSchema = z
 
     billBookId: objectIdString('Bill book ID').optional(),
 
-    storageGatePasses: z
-      .array(outgoingStorageGatePassAllocationSchema)
-      .min(1, 'At least one storage gate pass with allocations is required'),
+    orderDetails: z
+      .array(orderDetailSchema)
+      .min(1, 'At least one order detail is required'),
 
     remarks: z
       .string()
@@ -167,6 +154,15 @@ export const createOutgoingGatePassSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
+    if (!data.orderDetails.some((line) => line.quantity > 0)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['orderDetails'],
+        message:
+          'At least one order detail must have quantity greater than zero',
+      });
+    }
+
     if (data.category === DIRECT_SALE_CATEGORY) {
       if (!data.dispatchLedgerId) {
         ctx.addIssue({

@@ -1,9 +1,13 @@
 import mongoose, { Schema, Document, Types, Model } from 'mongoose';
-import { BagType } from '../storage-gate-pass/storage-gate-pass.model.js';
 
 /* =======================
    ENUMS
 ======================= */
+
+export enum BagType {
+  JUTE = 'JUTE',
+  LENO = 'LENO',
+}
 
 const twoDecimalFloat = (value: number) => {
   if (typeof value !== 'number') return value;
@@ -29,28 +33,6 @@ export interface IOutgoingOrderDetail {
   chamber: string;
   floor: string;
   row: string;
-}
-
-/** Allocated bag line within a storage gate pass snapshot */
-export interface IOutgoingStorageGatePassSnapshotBagSize {
-  size: string;
-  bagType: BagType;
-  chamber: string;
-  floor: string;
-  row: string;
-  initialQuantity: number;
-  currentQuantity: number;
-  /** Bags deducted from this line; authoritative for cancel stock restore */
-  quantityIssued: number;
-}
-
-/** Point-in-time snapshot of each storage gate pass touched by this outgoing pass */
-export interface IOutgoingStorageGatePassSnapshot {
-  _id: Types.ObjectId;
-  gatePassNo: number;
-  variety: string;
-  storageCategory: string;
-  bagSizes: IOutgoingStorageGatePassSnapshotBagSize[];
 }
 
 export interface IOutgoingGatePass extends Document {
@@ -83,7 +65,6 @@ export interface IOutgoingGatePass extends Document {
   costPerBag?: number;
 
   orderDetails: IOutgoingOrderDetail[];
-  storageGatePassSnapshots: IOutgoingStorageGatePassSnapshot[];
 
   remarks?: string;
 
@@ -163,99 +144,6 @@ const OutgoingOrderDetailSchema = new Schema<IOutgoingOrderDetail>(
   },
   { _id: false }
 );
-
-const OutgoingStorageGatePassSnapshotBagSizeSchema =
-  new Schema<IOutgoingStorageGatePassSnapshotBagSize>(
-    {
-      size: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      bagType: {
-        type: String,
-        enum: Object.values(BagType),
-        required: true,
-      },
-
-      chamber: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      floor: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      row: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      initialQuantity: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-
-      currentQuantity: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-
-      quantityIssued: {
-        type: Number,
-        required: true,
-        min: 0,
-      },
-    },
-    { _id: false }
-  );
-
-const OutgoingStorageGatePassSnapshotSchema =
-  new Schema<IOutgoingStorageGatePassSnapshot>(
-    {
-      _id: {
-        type: Schema.Types.ObjectId,
-        ref: 'StorageGatePass',
-        required: true,
-      },
-
-      gatePassNo: {
-        type: Number,
-        required: true,
-      },
-
-      variety: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      storageCategory: {
-        type: String,
-        required: true,
-        trim: true,
-      },
-
-      bagSizes: {
-        type: [OutgoingStorageGatePassSnapshotBagSizeSchema],
-        required: true,
-        validate: {
-          validator: (sizes: IOutgoingStorageGatePassSnapshotBagSize[]) =>
-            sizes.length > 0,
-          message: 'At least one bag size is required in snapshot',
-        },
-      },
-    },
-    { _id: false }
-  );
 
 /* =======================
    MAIN SCHEMA
@@ -389,16 +277,6 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
       },
     },
 
-    storageGatePassSnapshots: {
-      type: [OutgoingStorageGatePassSnapshotSchema],
-      required: true,
-      validate: {
-        validator: (snapshots: IOutgoingStorageGatePassSnapshot[]) =>
-          snapshots.length > 0,
-        message: 'At least one storage gate pass snapshot is required',
-      },
-    },
-
     remarks: {
       type: String,
       trim: true,
@@ -474,12 +352,6 @@ OutgoingGatePassSchema.index(
   { farmerStorageLinkId: 1, gatePassNo: 1 },
   { unique: true }
 );
-
-// Find outgoing passes that drew from a given storage gate pass
-OutgoingGatePassSchema.index({
-  'storageGatePassSnapshots._id': 1,
-  createdAt: -1,
-});
 
 // Gate passes by date for reporting
 OutgoingGatePassSchema.index({ date: -1 });

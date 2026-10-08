@@ -101,7 +101,7 @@ export async function getFarmerStorageLinksByColdStorageHandler(
 }
 
 /**
- * Handler for retrieving all incoming, grading, and storage gate passes for a farmer-storage-link
+ * Handler for retrieving outgoing gate passes for a farmer-storage-link
  */
 export async function getGatePassesHandler(
   request: FastifyRequest<{ Params: { farmerStorageLinkId: string } }>,

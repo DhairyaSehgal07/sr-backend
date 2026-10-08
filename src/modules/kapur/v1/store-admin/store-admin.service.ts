@@ -25,17 +25,12 @@ import type { ResourcePermission } from '../role-permission/role-permission.mode
 import bcrypt from 'bcryptjs';
 import { Farmer } from '../farmer/farmer.model.js';
 import { FarmerStorageLink } from '../farmer-storage-link/farmer-storage-link.model.js';
-import { IncomingGatePass } from '../incoming-gate-pass/incoming-gate-pass.model.js';
-import { GradingGatePass } from '../grading-gate-pass/grading-gate-pass.model.js';
-import { StorageGatePass } from '../storage-gate-pass/storage-gate-pass.model.js';
 import { NikasiGatePass } from '../nikasi-gate-pass/nikasi-gate-pass.model.js';
-import { Booking } from '../booking/booking.model.js';
 import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
 import {
   OutgoingGatePass,
   OutgoingGatePassStatus,
 } from '../outgoing-gate-pass/outgoing-gate-pass.model.js';
-import { TransferStockGatePass } from '../transfer-stock/transfer-stock.model.js';
 
 /**
  * Get all available resources and actions for Admin permissions
@@ -484,8 +479,6 @@ interface DaybookCollectionNames {
   farmerStorageLinks: string;
   farmers: string;
   storeAdmins: string;
-  storageGatePasses: string;
-  outgoingGatePasses: string;
 }
 
 function buildDaybookPagination(
@@ -511,34 +504,6 @@ function getDaybookCollectionNames(): DaybookCollectionNames {
     farmerStorageLinks: FarmerStorageLink.collection.name,
     farmers: Farmer.collection.name,
     storeAdmins: StoreAdmin.collection.name,
-    storageGatePasses: StorageGatePass.collection.name,
-    outgoingGatePasses: OutgoingGatePass.collection.name,
-  };
-}
-
-function daybookStorageProjectStage(): mongoose.PipelineStage {
-  return {
-    $project: {
-      passKind: { $literal: 'storage' },
-      sortAt: '$createdAt',
-      _id: 1,
-      farmerStorageLinkId: 1,
-      createdBy: 1,
-      gatePassNo: 1,
-      manualGatePassNumber: 1,
-      date: 1,
-      variety: 1,
-      storageCategory: 1,
-      stage: 1,
-      bagSizes: {
-        $sortArray: {
-          input: { $ifNull: ['$bagSizes', []] },
-          sortBy: { size: 1 },
-        },
-      },
-      remarks: 1,
-      createdAt: 1,
-    },
   };
 }
 
@@ -576,7 +541,6 @@ function daybookOutgoingProjectStage(): mongoose.PipelineStage {
           sortBy: { size: 1 },
         },
       },
-      storageGatePassSnapshots: 1,
       remarks: 1,
       status: 1,
       createdAt: 1,
@@ -645,15 +609,13 @@ function daybookPopulateStages(
 
 function buildDaybookPipeline(
   linkIds: mongoose.Types.ObjectId[],
-  type: DaybookListType,
   sortDir: 1 | -1,
   page: number,
   limit: number,
   col: DaybookCollectionNames
 ): mongoose.PipelineStage[] {
-  const linkMatch = { farmerStorageLinkId: { $in: linkIds } };
   const outgoingMatch = {
-    ...linkMatch,
+    farmerStorageLinkId: { $in: linkIds },
     status: OutgoingGatePassStatus.ACTIVE,
   };
 
@@ -671,36 +633,9 @@ function buildDaybookPipeline(
     },
   };
 
-  if (type === 'incoming') {
-    return [
-      { $match: linkMatch },
-      daybookStorageProjectStage(),
-      { $sort: { sortAt: sortDir } },
-      facetStage,
-    ];
-  }
-
-  if (type === 'outgoing') {
-    return [
-      { $match: outgoingMatch },
-      daybookOutgoingProjectStage(),
-      { $sort: { sortAt: sortDir } },
-      facetStage,
-    ];
-  }
-
   return [
-    { $match: linkMatch },
-    daybookStorageProjectStage(),
-    {
-      $unionWith: {
-        coll: col.outgoingGatePasses,
-        pipeline: [
-          { $match: outgoingMatch },
-          daybookOutgoingProjectStage(),
-        ] as mongoose.PipelineStage.UnionWithPipelineStage[],
-      },
-    },
+    { $match: outgoingMatch },
+    daybookOutgoingProjectStage(),
     { $sort: { sortAt: sortDir } },
     facetStage,
   ];
@@ -715,8 +650,8 @@ async function resolveFarmerStorageLinkIds(
 }
 
 /**
- * Retrieves the cold-storage daybook: a paginated, merged ledger of storage
- * (incoming) and active outgoing gate passes, sorted by createdAt.
+ * Retrieves the cold-storage daybook: a paginated ledger of active outgoing
+ * gate passes, sorted by createdAt. type all and outgoing both return outgoing.
  */
 export async function getDaybook(
   coldStorageId: string,
@@ -755,17 +690,14 @@ export async function getDaybook(
     const col = getDaybookCollectionNames();
     const pipeline = buildDaybookPipeline(
       farmerStorageLinkIds,
-      type,
       sortDir,
       page,
       limit,
       col
     );
 
-    const aggregateModel =
-      type === 'outgoing' ? OutgoingGatePass : StorageGatePass;
-
-    const result = await aggregateModel.aggregate(pipeline).allowDiskUse(true);
+    const result =
+      await OutgoingGatePass.aggregate(pipeline).allowDiskUse(true);
 
     const totalCount =
       result[0]?.totalCount?.[0]?.value != null
@@ -1021,27 +953,6 @@ export async function getNextVoucherNumber(
 
   const filter = { farmerStorageLinkId: { $in: farmerStorageLinkIds } };
 
-  if (type === 'incoming-gate-pass') {
-    const count = await IncomingGatePass.countDocuments(filter);
-    const next = count + 1;
-    logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
-    return next;
-  }
-
-  if (type === 'grading-gate-pass') {
-    const count = await GradingGatePass.countDocuments(filter);
-    const next = count + 1;
-    logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
-    return next;
-  }
-
-  if (type === 'storage-gate-pass') {
-    const count = await StorageGatePass.countDocuments(filter);
-    const next = count + 1;
-    logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
-    return next;
-  }
-
   if (type === 'nikasi-gate-pass') {
     const dispatchLedgerIds = await DispatchLedger.find({
       coldStorageId: coldStorageObjectId,
@@ -1060,32 +971,6 @@ export async function getNextVoucherNumber(
 
   if (type === 'outgoing-gate-pass') {
     const count = await OutgoingGatePass.countDocuments(filter);
-    const next = count + 1;
-    logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
-    return next;
-  }
-
-  if (type === 'transfer-stock-gate-pass') {
-    const transferFilter = {
-      fromFarmerStorageLinkId: { $in: farmerStorageLinkIds },
-    };
-    const count = await TransferStockGatePass.countDocuments(transferFilter);
-    const next = count + 1;
-    logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
-    return next;
-  }
-
-  if (type === 'booking-gate-pass') {
-    const dispatchLedgerIds = await DispatchLedger.find({
-      coldStorageId: coldStorageObjectId,
-    })
-      .distinct('_id')
-      .lean();
-
-    const bookingFilter = {
-      dispatchLedgerId: { $in: dispatchLedgerIds },
-    };
-    const count = await Booking.countDocuments(bookingFilter);
     const next = count + 1;
     logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
     return next;

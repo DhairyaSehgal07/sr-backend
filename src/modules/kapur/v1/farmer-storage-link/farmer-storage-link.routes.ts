@@ -73,14 +73,14 @@ export async function farmerStorageLinkRoutes(fastify: FastifyInstance) {
     getFarmerStorageLinksByColdStorageHandler as never
   );
 
-  // Get all gate passes (incoming, grading, storage) for a farmer-storage-link
+  // Get outgoing gate passes for a farmer-storage-link
   fastify.get(
     '/:farmerStorageLinkId/gate-passes',
     {
       schema: {
         ...getGatePassesParamsSchema,
         description:
-          "Get all incoming, grading, and storage gate passes for a specific farmer-storage-link. Link must belong to the authenticated store admin's cold storage. Returns all vouchers (no pagination) with bag totals scoped to that farmer.",
+          "Get outgoing gate passes for a specific farmer-storage-link. Link must belong to the authenticated store admin's cold storage. Returns all vouchers (no pagination) with bag totals scoped to that farmer.",
         tags: ['Farmer Storage Link'],
         summary: 'Get gate passes by farmer-storage-link',
         params: {
@@ -95,29 +95,18 @@ export async function farmerStorageLinkRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            description:
-              'All incoming, grading, and storage gate passes with aggregate bag totals',
+            description: 'Outgoing gate passes with aggregate bag totals',
             type: 'object',
             properties: {
               success: { type: 'boolean' },
               data: {
                 type: 'object',
                 properties: {
-                  incoming: {
+                  outgoing: {
                     type: 'array',
                     items: { type: 'object', additionalProperties: true },
                   },
-                  grading: {
-                    type: 'array',
-                    items: { type: 'object', additionalProperties: true },
-                  },
-                  storage: {
-                    type: 'array',
-                    items: { type: 'object', additionalProperties: true },
-                  },
-                  totalIncomingBags: { type: 'number' },
-                  totalGradingBags: { type: 'number' },
-                  totalStorageBags: { type: 'number' },
+                  totalOutgoingBags: { type: 'number' },
                 },
               },
             },

@@ -29,7 +29,10 @@ const nikasiGatePassItemProperties = {
     type: 'number',
     description: 'Manual gate pass number',
   },
-  isBooked: { type: 'boolean', description: 'Whether this pass is booked' },
+  isBooked: {
+    type: 'boolean',
+    description: 'Stored flag; does not deduct booking stock',
+  },
   billNumber: { type: 'number', description: 'Bill number' },
   bitliNumber: { type: 'number', description: 'Bitli number' },
   billBookId: {
@@ -206,8 +209,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             },
           },
           400: {
-            description:
-              'Bad request (validation error, insufficient shed stock, or insufficient booked stock)',
+            description: 'Bad request (validation error)',
             type: 'object',
             properties: {
               status: { type: 'string' },

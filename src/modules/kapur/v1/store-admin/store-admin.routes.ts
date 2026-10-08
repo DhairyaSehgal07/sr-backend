@@ -109,7 +109,7 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
       schema: {
         ...getVoucherNumberQuerySchema,
         description:
-          'Get the next voucher (gate pass) number for the given voucher type (incoming-gate-pass, grading-gate-pass, storage-gate-pass, nikasi-gate-pass, outgoing-gate-pass, transfer-stock-gate-pass, booking-gate-pass), scoped to the authenticated user’s cold storage',
+          'Get the next voucher (gate pass) number for the given voucher type (nikasi-gate-pass, outgoing-gate-pass), scoped to the authenticated user’s cold storage',
         tags: ['Store Admin'],
         summary: 'Get voucher number',
         response: {
@@ -169,14 +169,14 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
     getNextVoucherNumberHandler as never
   );
 
-  // Get daybook (merged storage + outgoing gate pass ledger)
+  // Get daybook (outgoing gate pass ledger)
   fastify.get(
     '/daybook',
     {
       schema: {
         ...getDaybookQuerySchema,
         description:
-          'Get daybook: paginated ledger of storage (incoming) and active outgoing gate passes for the cold storage. Merged list sorted by createdAt. Query type=all|incoming|outgoing, sortBy=latest|oldest, page, limit.',
+          'Get daybook: paginated ledger of active outgoing gate passes for the cold storage, sorted by createdAt. Query type=all|outgoing, sortBy=latest|oldest, page, limit.',
         tags: ['Store Admin'],
         summary: 'Get daybook',
         querystring: {
@@ -184,9 +184,9 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
           properties: {
             type: {
               type: 'string',
-              enum: ['all', 'incoming', 'outgoing'],
+              enum: ['all', 'outgoing'],
               description:
-                'all = merged storage + outgoing; incoming = storage only; outgoing = outgoing only (default all)',
+                'all and outgoing both list outgoing gate passes (default all)',
             },
             sortBy: {
               type: 'string',

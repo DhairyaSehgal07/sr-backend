@@ -9,18 +9,12 @@ import { AppError } from './utils/errors.js';
 import { coldStorageRoutes } from './modules/kapur/v1/cold-storage/cold-storage.routes.js';
 import { storeAdminRoutes } from './modules/kapur/v1/store-admin/store-admin.routes.js';
 import { farmerStorageLinkRoutes } from './modules/kapur/v1/farmer-storage-link/farmer-storage-link.routes.js';
-import { incomingGatePassRoutes } from './modules/kapur/v1/incoming-gate-pass/incoming-gate-pass.routes.js';
-import { gradingGatePassRoutes } from './modules/kapur/v1/grading-gate-pass/grading-gate-pass.routes.js';
-import { storageGatePassRoutes } from './modules/kapur/v1/storage-gate-pass/storage-gate-pass.routes.js';
 import { nikasiGatePassRoutes } from './modules/kapur/v1/nikasi-gate-pass/nikaasi-gate-pass.routes.js';
-import { analyticsRoutes } from './modules/kapur/v1/analytics/analytics.routes.js';
 import { temperatureRoutes } from './modules/kapur/v1/temperature/temperature.routes.js';
 import { dispatchLedgerRoutes } from './modules/kapur/v1/dispatch-ledger/dispatch-ledger.routes.js';
-import { bookingRoutes } from './modules/kapur/v1/booking/booking.routes.js';
 import { billBookRoutes } from './modules/kapur/v1/bill-book/bill-book.routes.js';
 import { financesRoutes } from './modules/kapur/v1/finances/finances.routes.js';
 import { outgoingGatePassRoutes } from './modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.routes.js';
-import { transferStockRoutes } from './modules/kapur/v1/transfer-stock/transfer-stock.routes.js';
 config();
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -106,21 +100,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     prefix: '/api/v1/farmer-storage-link',
   });
 
-  // Register incoming gate pass routes
-  await fastify.register(incomingGatePassRoutes, {
-    prefix: '/api/v1/incoming-gate-pass',
-  });
-
-  // Register grading gate pass routes
-  await fastify.register(gradingGatePassRoutes, {
-    prefix: '/api/v1/grading-gate-pass',
-  });
-
-  // Register storage gate pass routes
-  await fastify.register(storageGatePassRoutes, {
-    prefix: '/api/v1/storage-gate-pass',
-  });
-
   // Register nikasi gate pass routes
   await fastify.register(nikasiGatePassRoutes, {
     prefix: '/api/v1/nikasi-gate-pass',
@@ -131,16 +110,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
     prefix: '/api/v1/outgoing-gate-pass',
   });
 
-  // Register transfer stock routes
-  await fastify.register(transferStockRoutes, {
-    prefix: '/api/v1/transfer-stock',
-  });
-
-  // Register analytics routes
-  await fastify.register(analyticsRoutes, {
-    prefix: '/api/v1/analytics',
-  });
-
   // Register temperature routes
   await fastify.register(temperatureRoutes, {
     prefix: '/api/v1/temperature',
@@ -149,11 +118,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // Register dispatch ledger routes
   await fastify.register(dispatchLedgerRoutes, {
     prefix: '/api/v1/dispatch-ledger',
-  });
-
-  // Register booking routes
-  await fastify.register(bookingRoutes, {
-    prefix: '/api/v1/booking',
   });
 
   // Register bill book routes
