@@ -233,6 +233,10 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
                       type: 'string',
                       description: 'Outgoing pass: bilti book',
                     },
+                    shed: {
+                      type: 'string',
+                      description: 'Outgoing pass: shed',
+                    },
                     category: {
                       type: 'string',
                       description: 'Outgoing pass: category',
