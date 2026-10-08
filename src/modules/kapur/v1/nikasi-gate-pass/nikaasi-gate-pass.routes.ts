@@ -93,7 +93,6 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             'gatePassNo',
             'category',
             'date',
-            'from',
             'bagSize',
             'billBookId',
           ],
@@ -144,7 +143,10 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
               format: 'date-time',
               description: 'Gate pass date',
             },
-            from: { type: 'string', description: 'Source location' },
+            from: {
+              type: 'string',
+              description: 'Optional source location',
+            },
             to: { type: 'string', description: 'Destination location' },
             truckNumber: { type: 'string', description: 'Truck number' },
             transportCompany: {

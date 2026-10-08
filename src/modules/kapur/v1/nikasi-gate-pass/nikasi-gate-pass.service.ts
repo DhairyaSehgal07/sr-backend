@@ -596,7 +596,7 @@ export async function createNikasiGatePass(
       ...(payload.biltiBook !== undefined && { biltiBook: payload.biltiBook }),
       category: payload.category,
       date: payload.date,
-      from: payload.from,
+      ...(payload.from !== undefined && { from: payload.from }),
       ...(payload.to !== undefined && { to: payload.to }),
       ...(payload.truckNumber !== undefined && {
         truckNumber: payload.truckNumber,
@@ -913,7 +913,7 @@ type NikasiGatePassReportLean = {
   biltiBook?: string;
   category: string;
   date?: Date | string;
-  from: string;
+  from?: string;
   to?: string;
   truckNumber?: string;
   transportCompany?: string;
@@ -957,7 +957,6 @@ function mapNikasiGatePassToReport(
     gatePassNo: pass.gatePassNo,
     date: formatReportDateTime(pass.date),
     category: pass.category,
-    from: pass.from,
     bagSize,
     totalBags,
   };
@@ -1006,6 +1005,10 @@ function mapNikasiGatePassToReport(
 
   if (pass.biltiBook != null) {
     report.biltiBook = pass.biltiBook;
+  }
+
+  if (pass.from != null && pass.from !== '') {
+    report.from = pass.from;
   }
 
   if (pass.to != null) {

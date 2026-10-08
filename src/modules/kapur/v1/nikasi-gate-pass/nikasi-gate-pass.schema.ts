@@ -75,7 +75,7 @@ export const createNikasiGatePassSchema = z.object({
 
   date: z.coerce.date(),
 
-  from: z.string().trim().min(1, 'From location is required'),
+  from: z.string().trim().optional(),
 
   to: z.string().trim().optional(),
 
@@ -194,7 +194,7 @@ export interface NikasiReport {
   biltiBook?: string;
   category: string;
   date: string;
-  from: string;
+  from?: string;
   to?: string;
   truckNumber?: string;
   transportCompany?: string;
