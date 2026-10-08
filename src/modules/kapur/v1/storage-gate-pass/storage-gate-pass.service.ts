@@ -2,11 +2,16 @@ import mongoose, { ClientSession, Types } from 'mongoose';
 import type { FastifyBaseLogger } from 'fastify';
 import { StorageGatePass } from './storage-gate-pass.model.js';
 import {
+  OutgoingGatePass,
+  OutgoingGatePassStatus,
+} from '../outgoing-gate-pass/outgoing-gate-pass.model.js';
+import {
   StorageGatePassAudit,
   StorageGatePassAuditState,
 } from './storage-gate-pass-audit.model.js';
 import type {
   CreateStorageGatePassInput,
+  StorageGatePassSearchBy,
   StorageReport,
   UpdateStorageGatePassInput,
 } from './storage-gate-pass.schema.js';
@@ -886,15 +891,52 @@ export async function getStorageGatePassReport(
    SEARCH
 ======================= */
 
+const STORAGE_SEARCH_SELECT =
+  '_id farmerStorageLinkId createdBy gatePassNo manualGatePassNumber date variety storageCategory stage bagSizes remarks createdAt';
+
+const OUTGOING_SEARCH_SELECT =
+  '_id farmerStorageLinkId createdBy gatePassNo manualGatePassNumber date variety from to truckNumber transportCompany LSNumber driverName driverMobile owner shed billNumber biltiNumber billBook billBookId dispatchLedgerId biltiBook category costPerBag orderDetails storageGatePassSnapshots remarks status createdAt';
+
+type SizedLine = { size?: string };
+
+function sortLinesBySize<T extends SizedLine>(lines: T[]): T[] {
+  return [...lines].sort((a, b) =>
+    String(a.size ?? '').localeCompare(String(b.size ?? ''))
+  );
+}
+
+function toSearchDocument(
+  doc: Record<string, unknown>,
+  passKind: 'storage' | 'outgoing',
+  linesKey: 'bagSizes' | 'orderDetails'
+): Record<string, unknown> {
+  const lines = doc[linesKey];
+  return {
+    ...doc,
+    passKind,
+    [linesKey]: Array.isArray(lines)
+      ? sortLinesBySize(lines as SizedLine[])
+      : lines,
+  };
+}
+
 /**
- * Searches storage gate passes within a cold storage by exact gate pass number.
- * Matches documents where `number` equals either `gatePassNo` or `manualGatePassNumber`.
+ * Searches storage and active outgoing gate passes in a cold storage.
+ * `searchBy` chooses an exact match on `gatePassNo` or `manualGatePassNumber`.
  */
 export async function searchStorageGatePassesByNumber(
   coldStorageId: string,
   number: number,
-  logger?: FastifyBaseLogger
-): Promise<{ storageGatePasses: Array<Record<string, unknown>> }> {
+  logger?: FastifyBaseLogger,
+  options: { searchBy?: StorageGatePassSearchBy } = {}
+): Promise<{
+  storageGatePasses: Array<Record<string, unknown>>;
+  outgoingGatePasses: Array<Record<string, unknown>>;
+}> {
+  const searchBy = options.searchBy ?? 'gatePassNumber';
+  const matchField =
+    searchBy === 'manualGatePassNumber' ? 'manualGatePassNumber' : 'gatePassNo';
+
   try {
     if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
       throw new ValidationError(
@@ -913,48 +955,79 @@ export async function searchStorageGatePassesByNumber(
       .lean();
 
     if (farmerStorageLinkIds.length === 0) {
-      return { storageGatePasses: [] };
+      return { storageGatePasses: [], outgoingGatePasses: [] };
     }
 
-    const filter = {
-      $and: [
-        { farmerStorageLinkId: { $in: farmerStorageLinkIds } },
-        { $or: [{ gatePassNo: number }, { manualGatePassNumber: number }] },
-      ],
+    const linkFilter = {
+      farmerStorageLinkId: { $in: farmerStorageLinkIds },
+      [matchField]: number,
     };
 
-    const storageGatePasses = await StorageGatePass.find(filter)
-      .populate({
-        path: 'farmerStorageLinkId',
-        select: 'accountNumber farmerId linkedById',
-        populate: [
-          { path: 'farmerId', select: 'name mobileNumber address' },
-          { path: 'linkedById', select: 'name' },
-        ],
-      })
-      .populate({ path: 'createdBy', select: 'name' })
-      .sort({ gatePassNo: -1, date: -1 })
-      .limit(STORAGE_GATE_PASS_SEARCH_RESULT_LIMIT)
-      .lean();
+    const farmerPopulate = () => ({
+      path: 'farmerStorageLinkId' as const,
+      select: 'accountNumber farmerId',
+      populate: { path: 'farmerId', select: 'name address mobileNumber' },
+    });
+    const createdByPopulate = () => ({
+      path: 'createdBy' as const,
+      select: 'name',
+    });
 
-    logger?.info(
-      { coldStorageId, number, count: storageGatePasses.length },
-      'Searched storage gate passes by number'
+    const [storageDocs, outgoingDocs] = await Promise.all([
+      StorageGatePass.find(linkFilter)
+        .select(STORAGE_SEARCH_SELECT)
+        .populate(farmerPopulate())
+        .populate(createdByPopulate())
+        .sort({ gatePassNo: -1, date: -1 })
+        .limit(STORAGE_GATE_PASS_SEARCH_RESULT_LIMIT)
+        .lean(),
+      OutgoingGatePass.find({
+        ...linkFilter,
+        status: OutgoingGatePassStatus.ACTIVE,
+      })
+        .select(OUTGOING_SEARCH_SELECT)
+        .populate(farmerPopulate())
+        .populate(createdByPopulate())
+        .sort({ gatePassNo: -1, date: -1 })
+        .limit(STORAGE_GATE_PASS_SEARCH_RESULT_LIMIT)
+        .lean(),
+    ]);
+
+    const storageGatePasses = storageDocs.map((doc) =>
+      toSearchDocument(
+        doc as unknown as Record<string, unknown>,
+        'storage',
+        'bagSizes'
+      )
+    );
+    const outgoingGatePasses = outgoingDocs.map((doc) =>
+      toSearchDocument(
+        doc as unknown as Record<string, unknown>,
+        'outgoing',
+        'orderDetails'
+      )
     );
 
-    return {
-      storageGatePasses: storageGatePasses as unknown as Array<
-        Record<string, unknown>
-      >,
-    };
+    logger?.info(
+      {
+        coldStorageId,
+        number,
+        searchBy,
+        storageCount: storageGatePasses.length,
+        outgoingCount: outgoingGatePasses.length,
+      },
+      'Searched storage and outgoing gate passes by number'
+    );
+
+    return { storageGatePasses, outgoingGatePasses };
   } catch (error) {
     if (error instanceof ValidationError) {
       throw error;
     }
 
     logger?.error(
-      { error, coldStorageId, number },
-      'Error searching storage gate passes by number'
+      { error, coldStorageId, number, searchBy },
+      'Error searching storage and outgoing gate passes by number'
     );
 
     throw new AppError(

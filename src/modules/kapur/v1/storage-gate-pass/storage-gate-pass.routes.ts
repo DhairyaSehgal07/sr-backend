@@ -134,9 +134,9 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          "Search storage gate passes for the authenticated store admin's cold storage. Matches documents where the provided number equals either gatePassNo or manualGatePassNumber.",
+          "Search storage and active outgoing gate passes for the authenticated store admin's cold storage. searchBy chooses an exact match on gatePassNo (gatePassNumber) or manualGatePassNumber. Defaults to gatePassNumber.",
         tags: ['Storage Gate Pass'],
-        summary: 'Search storage gate passes by number',
+        summary: 'Search storage and outgoing gate passes by number',
         body: {
           type: 'object',
           required: ['number'],
@@ -144,13 +144,20 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
             number: {
               type: 'number',
               description:
-                'Gate pass number to search. Matches gatePassNo or manualGatePassNumber.',
+                'Positive integer to match. Meaning depends on searchBy.',
+            },
+            searchBy: {
+              type: 'string',
+              enum: ['gatePassNumber', 'manualGatePassNumber'],
+              description:
+                'gatePassNumber matches gatePassNo; manualGatePassNumber matches manualGatePassNumber. Default gatePassNumber.',
             },
           },
         },
         response: {
           200: {
-            description: 'Matching storage gate passes (may be empty)',
+            description:
+              'Matching storage and active outgoing gate passes (either array may be empty)',
             type: 'object',
             properties: {
               success: { type: 'boolean' },
@@ -158,6 +165,10 @@ export async function storageGatePassRoutes(fastify: FastifyInstance) {
                 type: 'object',
                 properties: {
                   storageGatePasses: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
+                  outgoingGatePasses: {
                     type: 'array',
                     items: { type: 'object', additionalProperties: true },
                   },

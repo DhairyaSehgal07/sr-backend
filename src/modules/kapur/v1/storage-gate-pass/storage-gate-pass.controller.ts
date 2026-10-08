@@ -15,6 +15,7 @@ import {
   GetStorageGatePassReportQuery,
   GetStorageGatePassesByFarmerStorageLinkParams,
   GetStorageGatePassesByFarmerStorageLinkQuery,
+  searchStorageGatePassSchema,
   updateStorageGatePassSchema,
   UpdateStorageGatePassInput,
   UpdateStorageGatePassParams,
@@ -195,24 +196,33 @@ export async function createStorageGatePassHandler(
 }
 
 /**
- * Handler for searching storage gate passes by gate pass number or manual gate pass number.
+ * Handler for searching storage and active outgoing gate passes by gate pass number or manual gate pass number.
  */
 export async function searchStorageGatePassHandler(
-  request: FastifyRequest<{ Body: { number: number } }>,
+  request: FastifyRequest,
   reply: FastifyReply
 ) {
   try {
+    const parsed = searchStorageGatePassSchema.safeParse(request.body);
+    if (!parsed.success) {
+      const message =
+        parsed.error.issues[0]?.message ?? 'Invalid search request';
+      throw new ValidationError(message, 'VALIDATION_ERROR');
+    }
+
     const coldStorageId = getColdStorageIdFromRequest(request);
     const result = await searchStorageGatePassesByNumber(
       coldStorageId,
-      request.body.number,
-      request.log
+      parsed.data.number,
+      request.log,
+      { searchBy: parsed.data.searchBy }
     );
 
     return reply.send({
       success: true,
       data: {
         storageGatePasses: result.storageGatePasses,
+        outgoingGatePasses: result.outgoingGatePasses,
       },
     });
   } catch (error) {

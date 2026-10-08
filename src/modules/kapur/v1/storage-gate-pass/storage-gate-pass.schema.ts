@@ -281,3 +281,28 @@ export const getStorageGatePassAuditsByColdStorageSchema = z.object({
 export type GetStorageGatePassAuditsByColdStorageQuery = z.infer<
   typeof getStorageGatePassAuditsByColdStorageSchema
 >['querystring'];
+
+export const STORAGE_GATE_PASS_SEARCH_BY = [
+  'gatePassNumber',
+  'manualGatePassNumber',
+] as const;
+
+export type StorageGatePassSearchBy =
+  (typeof STORAGE_GATE_PASS_SEARCH_BY)[number];
+
+export const searchStorageGatePassSchema = z.object({
+  number: z.coerce
+    .number()
+    .int('Number must be an integer')
+    .positive('Number must be a positive number'),
+  searchBy: z
+    .enum(STORAGE_GATE_PASS_SEARCH_BY, {
+      message: 'searchBy must be "gatePassNumber" or "manualGatePassNumber"',
+    })
+    .optional()
+    .default('gatePassNumber'),
+});
+
+export type SearchStorageGatePassInput = z.infer<
+  typeof searchStorageGatePassSchema
+>;
