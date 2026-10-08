@@ -10,7 +10,6 @@ import { coldStorageRoutes } from './modules/kapur/v1/cold-storage/cold-storage.
 import { storeAdminRoutes } from './modules/kapur/v1/store-admin/store-admin.routes.js';
 import { farmerStorageLinkRoutes } from './modules/kapur/v1/farmer-storage-link/farmer-storage-link.routes.js';
 import { nikasiGatePassRoutes } from './modules/kapur/v1/nikasi-gate-pass/nikaasi-gate-pass.routes.js';
-import { temperatureRoutes } from './modules/kapur/v1/temperature/temperature.routes.js';
 import { dispatchLedgerRoutes } from './modules/kapur/v1/dispatch-ledger/dispatch-ledger.routes.js';
 import { billBookRoutes } from './modules/kapur/v1/bill-book/bill-book.routes.js';
 import { financesRoutes } from './modules/kapur/v1/finances/finances.routes.js';
@@ -108,11 +107,6 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // Register outgoing gate pass routes
   await fastify.register(outgoingGatePassRoutes, {
     prefix: '/api/v1/outgoing-gate-pass',
-  });
-
-  // Register temperature routes
-  await fastify.register(temperatureRoutes, {
-    prefix: '/api/v1/temperature',
   });
 
   // Register dispatch ledger routes

@@ -96,7 +96,6 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             'gatePassNo',
             'category',
             'date',
-            'from',
             'bagSize',
             'billBookId',
           ],

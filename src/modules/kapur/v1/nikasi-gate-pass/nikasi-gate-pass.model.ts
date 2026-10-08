@@ -27,7 +27,7 @@ export interface INikasiGatePass extends Document {
 
   date: Date;
 
-  from: string;
+  from?: string;
   to?: string;
 
   truckNumber?: string;
@@ -157,7 +157,6 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
 
     from: {
       type: String,
-      required: true,
       trim: true,
     },
 

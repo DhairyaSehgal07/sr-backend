@@ -20,7 +20,6 @@ import { NikasiGatePass } from '../modules/kapur/v1/nikasi-gate-pass/nikasi-gate
 import { Preferences } from '../modules/kapur/v1/preferences/preferences.model.js';
 import { RolePermission } from '../modules/kapur/v1/role-permission/role-permission.model.js';
 import { StoreAdmin } from '../modules/kapur/v1/store-admin/store-admin.model.js';
-import { Temperature } from '../modules/kapur/v1/temperature/temperature.model.js';
 import { DispatchLedger } from '../modules/kapur/v1/dispatch-ledger/dispatch-ledger.model.js';
 import { OutgoingGatePass } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.model.js';
 import { OutgoingGatePassAudit } from '../modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass-audit.model.js';
@@ -37,7 +36,6 @@ const MODELS = [
   Preferences,
   RolePermission,
   StoreAdmin,
-  Temperature,
   DispatchLedger,
   OutgoingGatePass,
   OutgoingGatePassAudit,
