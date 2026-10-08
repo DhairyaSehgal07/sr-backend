@@ -87,6 +87,9 @@ export interface IOutgoingGatePass extends Document {
 
   remarks?: string;
 
+  /** Whether bags on this pass received pre-sowing treatment */
+  'pre-sowing-treatment': boolean;
+
   status: OutgoingGatePassStatus;
   cancelledAt?: Date;
   cancelledBy?: Types.ObjectId;
@@ -399,6 +402,12 @@ const OutgoingGatePassSchema = new Schema<IOutgoingGatePass>(
     remarks: {
       type: String,
       trim: true,
+    },
+
+    'pre-sowing-treatment': {
+      type: Boolean,
+      default: false,
+      required: true,
     },
 
     status: {

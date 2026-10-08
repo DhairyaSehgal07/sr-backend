@@ -147,6 +147,8 @@ export const createOutgoingGatePassSchema = z
       .max(500, 'Remarks must not exceed 500 characters')
       .optional(),
 
+    'pre-sowing-treatment': z.boolean().optional(),
+
     replacesOutgoingGatePassId: z
       .string()
       .trim()
@@ -356,6 +358,7 @@ export const updateOutgoingGatePassBodySchema = z
         z.null(),
       ])
       .optional(),
+    'pre-sowing-treatment': z.boolean().optional(),
   })
   .refine((data) => Object.values(data).some((value) => value !== undefined), {
     message: 'At least one field must be provided for update',

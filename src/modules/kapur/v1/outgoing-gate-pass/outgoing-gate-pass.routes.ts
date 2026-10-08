@@ -121,6 +121,11 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
               },
             },
             remarks: { type: 'string', description: 'Remarks' },
+            'pre-sowing-treatment': {
+              type: 'boolean',
+              description:
+                'Whether bags received pre-sowing treatment. Defaults to false when omitted.',
+            },
             replacesOutgoingGatePassId: {
               type: 'string',
               description:
@@ -305,7 +310,7 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
+          'Update an active outgoing gate pass. Allowed fields: date, manualGatePassNumber, from, to, remarks, truckNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, costPerBag, pre-sowing-treatment. gatePassNo, variety, allocations, and other stock-related fields cannot be changed via this endpoint. Pass null for manualGatePassNumber, transportCompany, LSNumber, driverName, driverMobile, owner, shed, billNumber, biltiNumber, billBook, biltiBook, category, or costPerBag to clear them. Creates an audit record with previousState and modifiedState containing only the fields that changed.',
         tags: ['Outgoing Gate Pass'],
         summary: 'Update outgoing gate pass',
         params: {
@@ -385,6 +390,10 @@ export async function outgoingGatePassRoutes(fastify: FastifyInstance) {
             costPerBag: {
               type: ['number', 'null'],
               description: 'Cost per bag. Pass null to clear.',
+            },
+            'pre-sowing-treatment': {
+              type: 'boolean',
+              description: 'Whether bags received pre-sowing treatment.',
             },
           },
         },

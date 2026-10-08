@@ -106,6 +106,7 @@ const OUTGOING_GATE_PASS_EDITABLE_FIELDS = [
   'biltiBook',
   'category',
   'costPerBag',
+  'pre-sowing-treatment',
 ] as const;
 
 const OUTGOING_GATE_PASS_NULLABLE_UPDATE_FIELDS = [
@@ -672,6 +673,7 @@ async function formatOutgoingGatePassResponse(
 
   return {
     ...raw,
+    'pre-sowing-treatment': raw['pre-sowing-treatment'] === true,
     farmerStorageLinkId:
       populatedLink && populatedLink.farmerId
         ? {
@@ -1062,6 +1064,9 @@ export async function createOutgoingGatePass(
           ...(payload.category !== undefined && { category: payload.category }),
           ...(payload.costPerBag !== undefined && {
             costPerBag: payload.costPerBag,
+          }),
+          ...(payload['pre-sowing-treatment'] !== undefined && {
+            'pre-sowing-treatment': payload['pre-sowing-treatment'],
           }),
           orderDetails,
           storageGatePassSnapshots,
