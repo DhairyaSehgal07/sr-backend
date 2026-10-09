@@ -4,14 +4,14 @@ import mongoose, { Schema, Document, Types, Model } from 'mongoose';
    INTERFACES
 ======================= */
 
-interface INikasiBagSize {
+interface ISandhuBagSize {
   size: string;
   variety: string;
   quantityIssued: number;
   costPerBag: number;
 }
 
-export interface INikasiGatePass extends Document {
+export interface ISandhuDispatch extends Document {
   dispatchLedgerId: Types.ObjectId;
   createdBy?: Types.ObjectId;
   gatePassNo: number;
@@ -37,7 +37,7 @@ export interface INikasiGatePass extends Document {
   driverMobile?: string;
   owner?: string;
 
-  bagSize: INikasiBagSize[];
+  bagSize: ISandhuBagSize[];
 
   remarks?: string;
 
@@ -55,7 +55,7 @@ export interface INikasiGatePass extends Document {
    SUB SCHEMAS
 ======================= */
 
-const NikasiBagSizeSchema = new Schema<INikasiBagSize>(
+const SandhuBagSizeSchema = new Schema<ISandhuBagSize>(
   {
     size: {
       type: String,
@@ -88,7 +88,7 @@ const NikasiBagSizeSchema = new Schema<INikasiBagSize>(
    MAIN SCHEMA
 ======================= */
 
-const NikasiGatePassSchema = new Schema<INikasiGatePass>(
+const SandhuDispatchSchema = new Schema<ISandhuDispatch>(
   {
     dispatchLedgerId: {
       type: Schema.Types.ObjectId,
@@ -197,10 +197,10 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
     },
 
     bagSize: {
-      type: [NikasiBagSizeSchema],
+      type: [SandhuBagSizeSchema],
       required: true,
       validate: {
-        validator: (details: INikasiBagSize[]) => details.length > 0,
+        validator: (details: ISandhuBagSize[]) => details.length > 0,
         message: 'At least one bag size is required',
       },
     },
@@ -225,6 +225,7 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
   },
   {
     timestamps: true,
+    collection: 'sandhu-dispatch',
   }
 );
 
@@ -232,30 +233,31 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
    INDEXES
 ======================= */
 
-NikasiGatePassSchema.index(
+SandhuDispatchSchema.index(
   { idempotencyKey: 1 },
   { unique: true, sparse: true }
 );
 
-// Created by user lookup
-// createdBy is indexed via field-level index: true
-
 // Dispatch ledger lookup by date
-NikasiGatePassSchema.index({ dispatchLedgerId: 1, date: -1 });
+SandhuDispatchSchema.index({ dispatchLedgerId: 1, date: -1 });
 
 // Voucher number unique per dispatch ledger
-NikasiGatePassSchema.index(
+SandhuDispatchSchema.index(
   { dispatchLedgerId: 1, gatePassNo: 1 },
   { unique: true }
 );
 
 // Gate passes by date for reporting
-NikasiGatePassSchema.index({ date: -1 });
+SandhuDispatchSchema.index({ date: -1 });
 
 /* =======================
    MODEL
 ======================= */
 
-export const NikasiGatePass: Model<INikasiGatePass> =
-  mongoose.models.NikasiGatePass ||
-  mongoose.model<INikasiGatePass>('NikasiGatePass', NikasiGatePassSchema);
+export const SandhuDispatch: Model<ISandhuDispatch> =
+  mongoose.models.SandhuDispatch ||
+  mongoose.model<ISandhuDispatch>(
+    'SandhuDispatch',
+    SandhuDispatchSchema,
+    'sandhu-dispatch'
+  );

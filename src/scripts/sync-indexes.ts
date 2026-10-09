@@ -16,7 +16,8 @@ import { connectDB } from '../config/database.js';
 import { ColdStorage } from '../modules/kapur/v1/cold-storage/cold-storage.model.js';
 import { Farmer } from '../modules/kapur/v1/farmer/farmer.model.js';
 import { FarmerStorageLink } from '../modules/kapur/v1/farmer-storage-link/farmer-storage-link.model.js';
-import { NikasiGatePass } from '../modules/kapur/v1/nikasi-gate-pass/nikasi-gate-pass.model.js';
+import { SandhuDispatch } from '../modules/kapur/v1/nikasi-gate-pass/sandhu-dispatch.model.js';
+import { SandhuDispatchAudit } from '../modules/kapur/v1/nikasi-gate-pass/sandhu-dispatch-audit.model.js';
 import { Preferences } from '../modules/kapur/v1/preferences/preferences.model.js';
 import { RolePermission } from '../modules/kapur/v1/role-permission/role-permission.model.js';
 import { StoreAdmin } from '../modules/kapur/v1/store-admin/store-admin.model.js';
@@ -32,7 +33,8 @@ const MODELS = [
   ColdStorage,
   Farmer,
   FarmerStorageLink,
-  NikasiGatePass,
+  SandhuDispatch,
+  SandhuDispatchAudit,
   Preferences,
   RolePermission,
   StoreAdmin,

@@ -1,9 +1,13 @@
 import mongoose, { Types } from 'mongoose';
 import type { FastifyBaseLogger } from 'fastify';
 import {
-  NikasiGatePass,
-  type INikasiGatePass,
-} from './nikasi-gate-pass.model.js';
+  SandhuDispatch,
+  type ISandhuDispatch,
+} from './sandhu-dispatch.model.js';
+import {
+  SandhuDispatchAudit,
+  SandhuDispatchAuditAction,
+} from './sandhu-dispatch-audit.model.js';
 import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
 import type {
   CreateNikasiGatePassInput,
@@ -126,7 +130,7 @@ export async function createNikasiGatePass(
   payload: CreateNikasiGatePassInput,
   logger?: FastifyBaseLogger,
   createdBy?: string
-): Promise<INikasiGatePass> {
+): Promise<ISandhuDispatch> {
   if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
     throw new ValidationError(
       'Invalid cold storage ID format',
@@ -149,7 +153,7 @@ export async function createNikasiGatePass(
     );
 
     if (payload.idempotencyKey) {
-      const existing = await NikasiGatePass.findOne({
+      const existing = await SandhuDispatch.findOne({
         idempotencyKey: payload.idempotencyKey,
       })
         .session(session)
@@ -165,7 +169,7 @@ export async function createNikasiGatePass(
           'Idempotency: returning existing nikasi gate pass'
         );
         await session.commitTransaction();
-        return withLiveBillBookName(existing) as INikasiGatePass;
+        return withLiveBillBookName(existing) as ISandhuDispatch;
       }
     }
 
@@ -190,7 +194,7 @@ export async function createNikasiGatePass(
       .distinct('_id')
       .lean();
 
-    const existingByGatePassNo = await NikasiGatePass.findOne({
+    const existingByGatePassNo = await SandhuDispatch.findOne({
       gatePassNo: payload.gatePassNo,
       dispatchLedgerId: { $in: dispatchLedgerIds },
     })
@@ -223,7 +227,7 @@ export async function createNikasiGatePass(
       0
     );
 
-    const nikasiGatePass = new NikasiGatePass({
+    const nikasiGatePass = new SandhuDispatch({
       dispatchLedgerId: new Types.ObjectId(payload.dispatchLedgerId),
       ...(createdBy && { createdBy: new Types.ObjectId(createdBy) }),
       gatePassNo: payload.gatePassNo,
@@ -295,6 +299,33 @@ export async function createNikasiGatePass(
       session,
     });
 
+    await new SandhuDispatchAudit({
+      sandhuDispatchId: nikasiGatePass._id,
+      action: SandhuDispatchAuditAction.CREATE,
+      ...(createdBy && { performedById: new Types.ObjectId(createdBy) }),
+      previousState: {},
+      modifiedState: {
+        gatePassNo: nikasiGatePass.gatePassNo,
+        dispatchLedgerId: String(nikasiGatePass.dispatchLedgerId),
+        billBookId: String(nikasiGatePass.billBookId),
+        category: nikasiGatePass.category,
+        date: nikasiGatePass.date.toISOString(),
+        bagSize: nikasiGatePass.bagSize.map((line) => ({
+          size: line.size,
+          variety: line.variety,
+          quantityIssued: line.quantityIssued,
+          costPerBag: line.costPerBag,
+        })),
+        isBooked: nikasiGatePass.isBooked ?? false,
+        ...(nikasiGatePass.billNumber !== undefined && {
+          billNumber: nikasiGatePass.billNumber,
+        }),
+        ...(nikasiGatePass.netWeight !== undefined && {
+          netWeight: nikasiGatePass.netWeight,
+        }),
+      },
+    }).save({ session });
+
     await session.commitTransaction();
     await nikasiGatePass.populate(billBookPopulate);
     return withLiveBillBookName(nikasiGatePass);
@@ -364,8 +395,8 @@ export async function getPaginatedNikasiGatePassesByColdStorage(
     }
 
     const [total, nikasiGatePasses] = await Promise.all([
-      NikasiGatePass.countDocuments(match),
-      NikasiGatePass.find(match)
+      SandhuDispatch.countDocuments(match),
+      SandhuDispatch.find(match)
         .populate({
           path: 'dispatchLedgerId',
           select: 'name address mobileNumber',
@@ -452,7 +483,7 @@ export async function getNikasiGatePassesByDispatchLedger(
       );
     }
 
-    const nikasiGatePasses = await NikasiGatePass.find({
+    const nikasiGatePasses = await SandhuDispatch.find({
       dispatchLedgerId: dispatchLedger._id,
     })
       .populate({
@@ -550,7 +581,7 @@ export async function searchNikasiGatePassesByNumber(
       ],
     };
 
-    const nikasiGatePasses = await NikasiGatePass.find(filter)
+    const nikasiGatePasses = await SandhuDispatch.find(filter)
       .populate({
         path: 'dispatchLedgerId',
         select: 'name address mobileNumber',
@@ -830,7 +861,7 @@ export async function getNikasiGatePassReport(
       filter.date = dateConditions;
     }
 
-    const nikasiGatePasses = await NikasiGatePass.find(filter)
+    const nikasiGatePasses = await SandhuDispatch.find(filter)
       .populate({
         path: 'dispatchLedgerId',
         select: 'name address mobileNumber',

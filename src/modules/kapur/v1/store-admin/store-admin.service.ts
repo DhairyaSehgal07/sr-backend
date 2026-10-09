@@ -25,7 +25,7 @@ import type { ResourcePermission } from '../role-permission/role-permission.mode
 import bcrypt from 'bcryptjs';
 import { Farmer } from '../farmer/farmer.model.js';
 import { FarmerStorageLink } from '../farmer-storage-link/farmer-storage-link.model.js';
-import { NikasiGatePass } from '../nikasi-gate-pass/nikasi-gate-pass.model.js';
+import { SandhuDispatch } from '../nikasi-gate-pass/sandhu-dispatch.model.js';
 import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
 import {
   OutgoingGatePass,
@@ -963,7 +963,7 @@ export async function getNextVoucherNumber(
     const nikasiFilter = {
       dispatchLedgerId: { $in: dispatchLedgerIds },
     };
-    const count = await NikasiGatePass.countDocuments(nikasiFilter);
+    const count = await SandhuDispatch.countDocuments(nikasiFilter);
     const next = count + 1;
     logger?.debug({ coldStorageId, type, count, next }, 'Next voucher number');
     return next;

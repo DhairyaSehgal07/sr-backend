@@ -34,7 +34,7 @@ const FinanceSaleSchema = new Schema<IFinanceSale>(
     },
     dispatchId: {
       type: Schema.Types.ObjectId,
-      ref: 'NikasiGatePass',
+      ref: 'SandhuDispatch',
       required: true,
     },
     date: {
