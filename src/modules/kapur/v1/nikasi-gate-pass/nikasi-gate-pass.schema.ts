@@ -168,6 +168,24 @@ export type GetNikasiGatePassReportQuery = z.infer<
   typeof getNikasiGatePassReportSchema
 >['querystring'];
 
+/** Gate passes for one dispatch ledger (party). `:id` is the dispatch ledger id. */
+export const getNikasiGatePassesByPartySchema = z.object({
+  params: z.object({
+    id: z
+      .string()
+      .trim()
+      .min(1, 'Dispatch ledger ID is required')
+      .refine(
+        (value) => mongoose.Types.ObjectId.isValid(value),
+        'Invalid dispatch ledger ID format'
+      ),
+  }),
+});
+
+export type GetNikasiGatePassesByPartyParams = z.infer<
+  typeof getNikasiGatePassesByPartySchema
+>['params'];
+
 export interface NikasiReportBagSize {
   size: string;
   variety: string;

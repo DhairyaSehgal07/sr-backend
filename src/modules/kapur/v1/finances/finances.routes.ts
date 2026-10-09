@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import {
   createFinanceRecoveryHandler,
   getFinanceOutstandingHandler,
+  getFinancePartyDetailsHandler,
   getFinanceRecoveriesHandler,
   getFinanceSalesHandler,
   getFinanceSummaryHandler,
@@ -9,6 +10,7 @@ import {
 import {
   createFinanceRecoverySchema,
   getFinanceListQuerySchema,
+  getFinancePartySchema,
 } from './finances.schema.js';
 import { authenticate } from '../../../../utils/auth.js';
 
@@ -306,5 +308,98 @@ export async function financesRoutes(fastify: FastifyInstance) {
       },
     },
     createFinanceRecoveryHandler as never
+  );
+
+  fastify.get(
+    '/:id',
+    {
+      schema: {
+        ...getFinancePartySchema,
+        description:
+          'Finance details for one dispatch ledger (party): summary, bill-book breakdown, sales, and recoveries. Optional billBookId narrows the figures to one bill book.',
+        tags: ['Finances'],
+        summary: 'Finance details for a party',
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Dispatch ledger (party) ID',
+            },
+          },
+        },
+        querystring: billBookQuerystring,
+        response: {
+          200: {
+            description: 'Finance details for the dispatch ledger',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              data: {
+                type: 'object',
+                properties: {
+                  dispatchLedger: {
+                    type: 'object',
+                    additionalProperties: true,
+                    properties: {
+                      _id: { type: 'string' },
+                      coldStorageId: { type: 'string' },
+                      name: { type: 'string' },
+                      address: { type: 'string' },
+                      mobileNumber: { type: 'string' },
+                      createdAt: { type: 'string', format: 'date-time' },
+                      updatedAt: { type: 'string', format: 'date-time' },
+                    },
+                  },
+                  summary: {
+                    type: 'object',
+                    properties: {
+                      billedPaise: { type: 'number' },
+                      recoveredPaise: { type: 'number' },
+                      outstandingPaise: { type: 'number' },
+                      saleCount: { type: 'number' },
+                      recoveryCount: { type: 'number' },
+                    },
+                  },
+                  byBillBook: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        billBookId: { type: 'string' },
+                        billBookName: { type: 'string' },
+                        billedPaise: { type: 'number' },
+                        recoveredPaise: { type: 'number' },
+                        outstandingPaise: { type: 'number' },
+                      },
+                    },
+                  },
+                  sales: {
+                    type: 'array',
+                    items: financeSaleSchema,
+                  },
+                  recoveries: {
+                    type: 'array',
+                    items: financeRecoverySchema,
+                  },
+                },
+              },
+            },
+          },
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+      preHandler: [authenticate],
+      config: {
+        rateLimit: {
+          max: 200,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    getFinancePartyDetailsHandler as never
   );
 }

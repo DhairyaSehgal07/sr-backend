@@ -599,3 +599,116 @@ export async function getFinanceRecoveries(
     );
   }
 }
+
+export async function getFinancePartyDetails(
+  coldStorageId: string,
+  dispatchLedgerId: string,
+  query: GetFinanceListQuery,
+  logger?: FastifyBaseLogger
+) {
+  try {
+    validateObjectId(
+      coldStorageId,
+      'Invalid cold storage ID format',
+      'INVALID_COLD_STORAGE_ID'
+    );
+    validateObjectId(
+      dispatchLedgerId,
+      'Invalid dispatch ledger ID format',
+      'INVALID_DISPATCH_LEDGER_ID'
+    );
+
+    const dispatchLedger = await DispatchLedger.findOne({
+      _id: new Types.ObjectId(dispatchLedgerId),
+      coldStorageId: new Types.ObjectId(coldStorageId),
+    }).lean();
+
+    if (!dispatchLedger) {
+      throw new NotFoundError(
+        'Dispatch ledger not found',
+        'DISPATCH_LEDGER_NOT_FOUND'
+      );
+    }
+
+    const filter = {
+      ...coldStorageFilter(coldStorageId, query),
+      dispatchLedgerId: dispatchLedger._id,
+    };
+
+    const [sales, recoveries, byBillBook] = await Promise.all([
+      FinanceSale.find(filter).sort({ date: -1, gatePassNo: -1 }).lean(),
+      FinanceRecovery.find(filter).sort({ date: -1, createdAt: -1 }).lean(),
+      FinanceSale.aggregate<{
+        billBookId: Types.ObjectId;
+        billBookName: string;
+        billedPaise: number;
+        recoveredPaise: number;
+        outstandingPaise: number;
+      }>([
+        { $match: filter },
+        {
+          $group: {
+            _id: '$billBookId',
+            billBookName: { $last: '$billBookName' },
+            billedPaise: { $sum: '$amountPaise' },
+            recoveredPaise: { $sum: '$recoveredPaise' },
+            outstandingPaise: { $sum: '$outstandingPaise' },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            billBookId: '$_id',
+            billBookName: 1,
+            billedPaise: 1,
+            recoveredPaise: 1,
+            outstandingPaise: 1,
+          },
+        },
+        { $sort: { billBookName: 1 } },
+      ]),
+    ]);
+
+    const billedPaise = sales.reduce((sum, sale) => sum + sale.amountPaise, 0);
+    const recoveredPaise = recoveries.reduce(
+      (sum, recovery) => sum + recovery.amountPaise,
+      0
+    );
+    const outstandingPaise = sales.reduce(
+      (sum, sale) => sum + sale.outstandingPaise,
+      0
+    );
+
+    logger?.info(
+      {
+        coldStorageId,
+        dispatchLedgerId,
+        billBookId: query.billBookId,
+        saleCount: sales.length,
+        recoveryCount: recoveries.length,
+      },
+      'Retrieved finance details for dispatch ledger'
+    );
+
+    return {
+      dispatchLedger,
+      summary: {
+        billedPaise,
+        recoveredPaise,
+        outstandingPaise,
+        saleCount: sales.length,
+        recoveryCount: recoveries.length,
+      },
+      byBillBook,
+      sales,
+      recoveries,
+    };
+  } catch (error) {
+    handleServiceError(
+      error,
+      logger,
+      'Failed to retrieve finance details for dispatch ledger',
+      'GET_FINANCE_PARTY_ERROR'
+    );
+  }
+}

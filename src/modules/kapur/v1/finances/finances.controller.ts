@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import {
   createFinanceRecovery,
   getFinanceOutstanding,
+  getFinancePartyDetails,
   getFinanceRecoveries,
   getFinanceSales,
   getFinanceSummary,
@@ -9,6 +10,7 @@ import {
 import type {
   CreateFinanceRecoveryInput,
   GetFinanceListQuery,
+  GetFinancePartyParams,
 } from './finances.schema.js';
 import {
   AppError,
@@ -218,6 +220,40 @@ export async function getFinanceRecoveriesHandler(
     request.log.error(
       { error, query: request.query },
       'Error in getFinanceRecoveriesHandler'
+    );
+    return sendError(reply, error);
+  }
+}
+
+export async function getFinancePartyDetailsHandler(
+  request: FastifyRequest<{
+    Params: GetFinancePartyParams;
+    Querystring: GetFinanceListQuery;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const coldStorageId = getColdStorageIdFromRequest(request);
+
+    if (!coldStorageId) {
+      return sendMissingColdStorage(reply);
+    }
+
+    const details = await getFinancePartyDetails(
+      coldStorageId,
+      request.params.id,
+      request.query,
+      request.log
+    );
+
+    return reply.send({
+      success: true,
+      data: details,
+    });
+  } catch (error) {
+    request.log.error(
+      { error, params: request.params, query: request.query },
+      'Error in getFinancePartyDetailsHandler'
     );
     return sendError(reply, error);
   }

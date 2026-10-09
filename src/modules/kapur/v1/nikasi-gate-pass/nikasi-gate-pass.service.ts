@@ -416,6 +416,87 @@ export async function getPaginatedNikasiGatePassesByColdStorage(
 }
 
 /**
+ * Retrieves every nikasi gate pass for one dispatch ledger (party), with no pagination.
+ */
+export async function getNikasiGatePassesByDispatchLedger(
+  coldStorageId: string,
+  dispatchLedgerId: string,
+  logger?: FastifyBaseLogger
+): Promise<{ nikasiGatePasses: Array<Record<string, unknown>> }> {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
+      throw new ValidationError(
+        'Invalid cold storage ID format',
+        'INVALID_COLD_STORAGE_ID'
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(dispatchLedgerId)) {
+      throw new ValidationError(
+        'Invalid dispatch ledger ID format',
+        'INVALID_DISPATCH_LEDGER_ID'
+      );
+    }
+
+    const dispatchLedger = await DispatchLedger.findOne({
+      _id: new Types.ObjectId(dispatchLedgerId),
+      coldStorageId: new Types.ObjectId(coldStorageId),
+    })
+      .select('_id')
+      .lean();
+
+    if (!dispatchLedger) {
+      throw new NotFoundError(
+        'Dispatch ledger not found',
+        'DISPATCH_LEDGER_NOT_FOUND'
+      );
+    }
+
+    const nikasiGatePasses = await NikasiGatePass.find({
+      dispatchLedgerId: dispatchLedger._id,
+    })
+      .populate({
+        path: 'dispatchLedgerId',
+        select: 'name address mobileNumber',
+      })
+      .populate({ path: 'createdBy', select: 'name' })
+      .populate(billBookPopulate)
+      .sort({ gatePassNo: -1, date: -1 })
+      .lean();
+
+    logger?.info(
+      {
+        coldStorageId,
+        dispatchLedgerId,
+        count: nikasiGatePasses.length,
+      },
+      'Retrieved nikasi gate passes for dispatch ledger'
+    );
+
+    return {
+      nikasiGatePasses: nikasiGatePasses.map((pass) =>
+        withLiveBillBookName(pass)
+      ) as unknown as Array<Record<string, unknown>>,
+    };
+  } catch (error) {
+    if (error instanceof ValidationError || error instanceof NotFoundError) {
+      throw error;
+    }
+
+    logger?.error(
+      { error, coldStorageId, dispatchLedgerId },
+      'Error retrieving nikasi gate passes for dispatch ledger'
+    );
+
+    throw new AppError(
+      'Failed to retrieve nikasi gate passes',
+      500,
+      'GET_NIKASI_GATE_PASSES_BY_PARTY_ERROR'
+    );
+  }
+}
+
+/**
  * Searches nikasi gate passes within a cold storage by exact gate pass number.
  * Matches documents where `number` equals gatePassNo, manualGatePassNumber,
  * billNumber, bitliNumber, billBook, or biltiBook.

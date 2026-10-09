@@ -33,9 +33,21 @@ export const getFinanceListQuerySchema = z.object({
   }),
 });
 
+export const getFinancePartySchema = z.object({
+  params: z.object({
+    id: objectIdSchema,
+  }),
+  querystring: z.object({
+    billBookId: objectIdSchema.optional(),
+  }),
+});
+
 export type CreateFinanceRecoveryInput = z.infer<
   typeof createFinanceRecoverySchema
 >['body'];
 export type GetFinanceListQuery = z.infer<
   typeof getFinanceListQuerySchema
 >['querystring'];
+export type GetFinancePartyParams = z.infer<
+  typeof getFinancePartySchema
+>['params'];

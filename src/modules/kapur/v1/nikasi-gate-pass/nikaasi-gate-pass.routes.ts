@@ -3,10 +3,12 @@ import {
   createNikasiGatePassHandler,
   getNikasiGatePassReportHandler,
   getNikasiGatePassesByColdStorageHandler,
+  getNikasiGatePassesByPartyHandler,
   searchNikasiGatePassHandler,
 } from './nikasi-gate-pass.controller.js';
 import {
   getNikasiGatePassReportSchema,
+  getNikasiGatePassesByPartySchema,
   searchNikasiGatePassSchema,
 } from './nikasi-gate-pass.schema.js';
 import { authenticate } from '../../../../utils/auth.js';
@@ -508,5 +510,100 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
       },
     },
     getNikasiGatePassesByColdStorageHandler as never
+  );
+
+  fastify.get(
+    '/:id',
+    {
+      schema: {
+        ...getNikasiGatePassesByPartySchema,
+        description:
+          "Get every nikasi (dispatch) gate pass for one dispatch ledger (party) in the authenticated store admin's cold storage. Sorted by gate pass number descending. No pagination.",
+        tags: ['Nikasi Gate Pass'],
+        summary: 'Get dispatch gate passes for a party',
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Dispatch ledger (party) ID',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'All nikasi gate passes for the party',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              data: {
+                type: 'object',
+                properties: {
+                  nikasiGatePasses: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: nikasiGatePassItemProperties,
+                      additionalProperties: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            description: 'Bad request',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+          401: {
+            description: 'Unauthorized or missing cold storage context',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+          404: {
+            description: 'Dispatch ledger not found',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+      preHandler: [authenticate],
+      config: {
+        rateLimit: {
+          max: 200,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    getNikasiGatePassesByPartyHandler as never
   );
 }

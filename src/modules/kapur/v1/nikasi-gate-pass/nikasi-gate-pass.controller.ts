@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import {
   createNikasiGatePass,
   getNikasiGatePassReport,
+  getNikasiGatePassesByDispatchLedger,
   getPaginatedNikasiGatePassesByColdStorage,
   searchNikasiGatePassesByNumber,
 } from './nikasi-gate-pass.service.js';
@@ -9,6 +10,7 @@ import {
   createNikasiGatePassSchema,
   CreateNikasiGatePassInput,
   GetNikasiGatePassReportQuery,
+  GetNikasiGatePassesByPartyParams,
   SearchNikasiGatePassInput,
 } from './nikasi-gate-pass.schema.js';
 import {
@@ -271,6 +273,38 @@ export async function getNikasiGatePassesByColdStorageHandler(
     request.log.error(
       { error },
       'Error in getNikasiGatePassesByColdStorageHandler'
+    );
+    return sendNikasiGatePassError(reply, error);
+  }
+}
+
+/**
+ * Handler for retrieving nikasi gate passes of one dispatch ledger (party).
+ */
+export async function getNikasiGatePassesByPartyHandler(
+  request: FastifyRequest<{
+    Params: GetNikasiGatePassesByPartyParams;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const coldStorageId = getColdStorageIdFromRequest(request);
+    const result = await getNikasiGatePassesByDispatchLedger(
+      coldStorageId,
+      request.params.id,
+      request.log
+    );
+
+    return reply.send({
+      success: true,
+      data: {
+        nikasiGatePasses: result.nikasiGatePasses,
+      },
+    });
+  } catch (error) {
+    request.log.error(
+      { error, params: request.params },
+      'Error in getNikasiGatePassesByPartyHandler'
     );
     return sendNikasiGatePassError(reply, error);
   }
