@@ -160,6 +160,21 @@ export type GetNikasiGatePassReportQuery = z.infer<
   typeof getNikasiGatePassReportSchema
 >['querystring'];
 
+export const markNikasiGatePassNullParamsSchema = z.object({
+  nikasiGatePassId: z
+    .string()
+    .trim()
+    .min(1, 'Nikasi gate pass ID is required')
+    .refine(
+      (val) => mongoose.Types.ObjectId.isValid(val),
+      'Invalid nikasi gate pass ID format'
+    ),
+});
+
+export type MarkNikasiGatePassNullParams = z.infer<
+  typeof markNikasiGatePassNullParamsSchema
+>;
+
 export interface NikasiReportBagSize {
   size: string;
   variety: string;
@@ -185,6 +200,7 @@ export interface NikasiReport {
   dispatchLedgerId: NikasiReportDispatchLedger;
   createdBy?: NikasiReportCreatedBy;
   gatePassNo: number;
+  status?: 'ACTIVE' | 'NULL';
   manualGatePassNumber?: number;
   isBooked?: boolean;
   billNumber?: number;

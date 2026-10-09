@@ -2,7 +2,10 @@ import mongoose, { ClientSession, Types } from 'mongoose';
 import type { FastifyBaseLogger } from 'fastify';
 import {
   NikasiGatePass,
+  NikasiGatePassStatus,
+  type INikasiBookingDeduction,
   type INikasiGatePass,
+  type INikasiShedDeduction,
 } from './nikasi-gate-pass.model.js';
 import { Booking } from '../booking/booking.model.js';
 import { DispatchLedger } from '../dispatch-ledger/dispatch-ledger.model.js';
@@ -19,7 +22,11 @@ import type {
 import { BillBook } from '../bill-book/bill-book.model.js';
 import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
 import { billedPaiseFromBagLines } from '../finances/money.js';
-import { postFinanceSaleFromNikasi } from '../finances/finances.service.js';
+import {
+  assertFinanceSaleCanBeNulled,
+  postFinanceSaleFromNikasi,
+  voidFinanceSaleForDispatch,
+} from '../finances/finances.service.js';
 import {
   AppError,
   ConflictError,
@@ -82,13 +89,13 @@ export interface NikasiGatePassesPagination {
   totalPages: number;
 }
 
-interface BookingBagSizeLean {
+export interface BookingBagSizeLean {
   size: string;
   variety: string;
   currentQuantity: number;
 }
 
-interface BookingLean {
+export interface BookingLean {
   _id: Types.ObjectId;
   bagSizes: BookingBagSizeLean[];
 }
@@ -109,7 +116,7 @@ interface ShedOrderDetailLean {
   row: string;
 }
 
-interface ShedPassLean {
+export interface ShedPassLean {
   _id: Types.ObjectId;
   variety: string;
   orderDetails: ShedOrderDetailLean[];
@@ -125,7 +132,7 @@ interface ShedDeduction {
   deductAmount: number;
 }
 
-interface RequestedBagLine {
+export interface RequestedBagLine {
   size: string;
   variety: string;
   quantityIssued: number;
@@ -177,7 +184,7 @@ function handleServiceError(error: unknown, logger?: FastifyBaseLogger): never {
   );
 }
 
-function computeFifoBookingDeductions(
+export function computeFifoBookingDeductions(
   bookings: BookingLean[],
   lines: RequestedBagLine[]
 ): BookingDeduction[] {
@@ -248,7 +255,7 @@ async function applyBookingFifoDeductions(
   dispatchLedgerId: string,
   lines: RequestedBagLine[],
   session: ClientSession
-): Promise<void> {
+): Promise<BookingDeduction[]> {
   const bookings = await Booking.find({
     dispatchLedgerId: new Types.ObjectId(dispatchLedgerId),
   })
@@ -259,7 +266,7 @@ async function applyBookingFifoDeductions(
 
   const deductions = computeFifoBookingDeductions(bookings, lines);
   if (deductions.length === 0) {
-    return;
+    return [];
   }
 
   for (const deduction of deductions) {
@@ -289,9 +296,11 @@ async function applyBookingFifoDeductions(
       );
     }
   }
+
+  return deductions;
 }
 
-function computeFifoShedDeductions(
+export function computeFifoShedDeductions(
   shedPasses: ShedPassLean[],
   lines: RequestedBagLine[]
 ): ShedDeduction[] {
@@ -378,50 +387,11 @@ function computeFifoShedDeductions(
   return deductions;
 }
 
-function prepareShedBulkOps(
-  deductions: ShedDeduction[]
-): mongoose.mongo.AnyBulkWriteOperation<typeof OutgoingGatePass.prototype>[] {
-  const bulkOps: Array<{
-    updateOne: {
-      filter: Record<string, unknown>;
-      update: Record<string, unknown>;
-      arrayFilters?: Array<Record<string, unknown>>;
-    };
-  }> = [];
-
-  for (const deduction of deductions) {
-    bulkOps.push({
-      updateOne: {
-        filter: { _id: deduction.outgoingGatePassId },
-        update: {
-          $inc: {
-            'orderDetails.$[elem].quantityIssued': -deduction.deductAmount,
-          },
-        },
-        arrayFilters: [
-          {
-            'elem.size': deduction.size,
-            'elem.bagType': deduction.bagType,
-            'elem.chamber': deduction.chamber,
-            'elem.floor': deduction.floor,
-            'elem.row': deduction.row,
-            'elem.quantityIssued': { $gte: deduction.deductAmount },
-          },
-        ],
-      },
-    });
-  }
-
-  return bulkOps as mongoose.mongo.AnyBulkWriteOperation<
-    typeof OutgoingGatePass.prototype
-  >[];
-}
-
 async function applyShedFifoDeductions(
   coldStorageId: string,
   lines: RequestedBagLine[],
   session: ClientSession
-): Promise<void> {
+): Promise<ShedDeduction[]> {
   const farmerStorageLinkIds = await FarmerStorageLink.find({
     coldStorageId: new Types.ObjectId(coldStorageId),
   })
@@ -444,20 +414,186 @@ async function applyShedFifoDeductions(
 
   const deductions = computeFifoShedDeductions(shedPasses, lines);
   if (deductions.length === 0) {
+    return [];
+  }
+
+  for (const deduction of deductions) {
+    const updateResult = await OutgoingGatePass.updateOne(
+      { _id: deduction.outgoingGatePassId },
+      {
+        $inc: {
+          'orderDetails.$[elem].quantityIssued': -deduction.deductAmount,
+        },
+      },
+      {
+        arrayFilters: [
+          {
+            'elem.size': deduction.size,
+            'elem.bagType': deduction.bagType,
+            'elem.chamber': deduction.chamber,
+            'elem.floor': deduction.floor,
+            'elem.row': deduction.row,
+            'elem.quantityIssued': { $gte: deduction.deductAmount },
+          },
+        ],
+        session,
+      }
+    );
+
+    if (updateResult.modifiedCount !== 1) {
+      throw new ConflictError(
+        `Expected 1 shed update, got ${updateResult.modifiedCount}. Concurrent modification detected.`,
+        'CONCURRENT_MODIFICATION'
+      );
+    }
+  }
+
+  return deductions;
+}
+
+function toStoredShedDeductions(
+  deductions: ShedDeduction[]
+): INikasiShedDeduction[] {
+  return deductions.map((deduction) => ({
+    outgoingGatePassId: deduction.outgoingGatePassId,
+    size: deduction.size,
+    bagType: deduction.bagType,
+    chamber: deduction.chamber,
+    floor: deduction.floor,
+    row: deduction.row,
+    quantity: deduction.deductAmount,
+  }));
+}
+
+function toStoredBookingDeductions(
+  deductions: BookingDeduction[]
+): INikasiBookingDeduction[] {
+  return deductions.map((deduction) => ({
+    bookingId: deduction.bookingId,
+    size: deduction.size,
+    variety: deduction.variety,
+    quantity: deduction.deductAmount,
+  }));
+}
+
+function issuedBagCount(bagSize: Array<{ quantityIssued: number }>): number {
+  return bagSize.reduce((total, line) => total + line.quantityIssued, 0);
+}
+
+function shedLineMatches(
+  detail: {
+    size: string;
+    bagType: string;
+    chamber: string;
+    floor: string;
+    row: string;
+  },
+  deduction: INikasiShedDeduction
+): boolean {
+  return (
+    detail.size === deduction.size &&
+    detail.bagType === deduction.bagType &&
+    detail.chamber === deduction.chamber &&
+    detail.floor === deduction.floor &&
+    detail.row === deduction.row
+  );
+}
+
+async function assertShedDeductionsRestorable(
+  deductions: INikasiShedDeduction[],
+  session: ClientSession
+): Promise<void> {
+  const ids = [
+    ...new Set(
+      deductions.map((deduction) => deduction.outgoingGatePassId.toString())
+    ),
+  ];
+  if (ids.length === 0) {
     return;
   }
 
-  const bulkOps = prepareShedBulkOps(deductions);
-  const updateResult = await OutgoingGatePass.bulkWrite(
-    bulkOps as Parameters<typeof OutgoingGatePass.bulkWrite>[0],
-    { session }
+  const passes = await OutgoingGatePass.find({
+    _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+  })
+    .select('status orderDetails')
+    .session(session)
+    .lean();
+
+  const passesById = new Map(passes.map((pass) => [pass._id.toString(), pass]));
+
+  for (const deduction of deductions) {
+    if (deduction.quantity <= 0) {
+      continue;
+    }
+
+    const pass = passesById.get(deduction.outgoingGatePassId.toString());
+    if (!pass) {
+      throw new NotFoundError(
+        'Outgoing gate pass for a stored deduction was not found',
+        'OUTGOING_GATE_PASS_NOT_FOUND'
+      );
+    }
+
+    if (pass.status !== OutgoingGatePassStatus.ACTIVE) {
+      throw new ValidationError(
+        'Outgoing gate pass is not active, so its quantity cannot be restored',
+        'OUTGOING_GATE_PASS_NOT_ACTIVE'
+      );
+    }
+
+    const matches = (pass.orderDetails ?? []).filter((detail) =>
+      shedLineMatches(detail, deduction)
+    );
+    if (matches.length !== 1) {
+      throw new ValidationError(
+        `Expected 1 outgoing line for size "${deduction.size}" at ${deduction.chamber}/${deduction.floor}/${deduction.row}, found ${matches.length}`,
+        'SHED_LINE_NOT_FOUND'
+      );
+    }
+  }
+}
+
+async function assertBookingDeductionsRestorable(
+  deductions: INikasiBookingDeduction[],
+  session: ClientSession
+): Promise<void> {
+  const ids = [
+    ...new Set(deductions.map((deduction) => deduction.bookingId.toString())),
+  ];
+  const bookings = await Booking.find({
+    _id: { $in: ids.map((id) => new Types.ObjectId(id)) },
+  })
+    .select('bagSizes')
+    .session(session)
+    .lean();
+
+  const bookingsById = new Map(
+    bookings.map((booking) => [booking._id.toString(), booking])
   );
 
-  if (updateResult.modifiedCount !== bulkOps.length) {
-    throw new ConflictError(
-      `Expected ${bulkOps.length} shed updates, got ${updateResult.modifiedCount}. Concurrent modification detected.`,
-      'CONCURRENT_MODIFICATION'
+  for (const deduction of deductions) {
+    if (deduction.quantity <= 0) {
+      continue;
+    }
+
+    const booking = bookingsById.get(deduction.bookingId.toString());
+    if (!booking) {
+      throw new NotFoundError(
+        'Booking for a stored deduction was not found',
+        'BOOKING_NOT_FOUND'
+      );
+    }
+
+    const matches = (booking.bagSizes ?? []).filter(
+      (line) =>
+        line.size === deduction.size && line.variety === deduction.variety
     );
+    if (matches.length !== 1) {
+      throw new ValidationError(
+        `Expected 1 booking line for size "${deduction.size}" variety "${deduction.variety}", found ${matches.length}`,
+        'BOOKING_LINE_NOT_FOUND'
+      );
+    }
   }
 }
 
@@ -465,6 +601,7 @@ async function applyShedFifoDeductions(
  * Creates a nikasi gate pass. Always deducts bag lines from ACTIVE outgoing-to-shed
  * stock for the cold storage (FIFO by date, gatePassNo). When isBooked is true,
  * also deducts the same lines from booking gate passes for the dispatch ledger.
+ * The exact lines deducted are stored on the pass so they can be restored later.
  */
 export async function createNikasiGatePass(
   coldStorageId: string,
@@ -549,15 +686,19 @@ export async function createNikasiGatePass(
       );
     }
 
-    await applyShedFifoDeductions(coldStorageId, payload.bagSize, session);
+    const shedDeductions = await applyShedFifoDeductions(
+      coldStorageId,
+      payload.bagSize,
+      session
+    );
 
-    if (payload.isBooked) {
-      await applyBookingFifoDeductions(
-        payload.dispatchLedgerId,
-        payload.bagSize,
-        session
-      );
-    }
+    const bookingDeductions = payload.isBooked
+      ? await applyBookingFifoDeductions(
+          payload.dispatchLedgerId,
+          payload.bagSize,
+          session
+        )
+      : [];
 
     const billBook = await getActiveBillBookById(
       payload.billBookId,
@@ -615,6 +756,9 @@ export async function createNikasiGatePass(
       }),
       ...(payload.owner !== undefined && { owner: payload.owner }),
       bagSize: payload.bagSize,
+      status: NikasiGatePassStatus.ACTIVE,
+      shedDeductions: toStoredShedDeductions(shedDeductions),
+      bookingDeductions: toStoredBookingDeductions(bookingDeductions),
       ...(payload.remarks !== undefined && { remarks: payload.remarks }),
       ...(payload.netWeight !== undefined && { netWeight: payload.netWeight }),
       ...(payload.averageWeightPerBag !== undefined && {
@@ -662,6 +806,200 @@ export async function createNikasiGatePass(
 }
 
 /**
+ * Marks a nikasi gate pass null: restores the outgoing and booking quantities
+ * recorded at create time, voids the finance sale, and keeps the document so
+ * its gate pass number stays taken.
+ */
+export async function markNikasiGatePassNull(
+  coldStorageId: string,
+  nikasiGatePassId: string,
+  logger?: FastifyBaseLogger,
+  nulledBy?: string
+): Promise<INikasiGatePass> {
+  if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
+    throw new ValidationError(
+      'Invalid cold storage ID format',
+      'INVALID_COLD_STORAGE_ID'
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(nikasiGatePassId)) {
+    throw new ValidationError(
+      'Invalid nikasi gate pass ID format',
+      'INVALID_NIKASI_GATE_PASS_ID'
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const coldStorageObjectId = new Types.ObjectId(coldStorageId);
+    const dispatchLedgerIds = await DispatchLedger.find({
+      coldStorageId: coldStorageObjectId,
+    })
+      .session(session)
+      .distinct('_id');
+
+    const nikasi = await NikasiGatePass.findOne({
+      _id: new Types.ObjectId(nikasiGatePassId),
+      dispatchLedgerId: { $in: dispatchLedgerIds },
+    }).session(session);
+
+    if (!nikasi) {
+      throw new NotFoundError(
+        'Nikasi gate pass not found',
+        'NIKASI_GATE_PASS_NOT_FOUND'
+      );
+    }
+
+    if (nikasi.status === NikasiGatePassStatus.NULL) {
+      throw new ConflictError(
+        'Nikasi gate pass is already null',
+        'NIKASI_GATE_PASS_ALREADY_NULL'
+      );
+    }
+
+    const bags = issuedBagCount(nikasi.bagSize);
+    const shedDeductions = nikasi.shedDeductions ?? [];
+    const bookingDeductions = nikasi.bookingDeductions ?? [];
+
+    if (bags > 0 && shedDeductions.length === 0) {
+      throw new ValidationError(
+        'Shed deductions are not recorded for this gate pass',
+        'MISSING_SHED_DEDUCTIONS'
+      );
+    }
+
+    if (nikasi.isBooked && bags > 0 && bookingDeductions.length === 0) {
+      throw new ValidationError(
+        'Booking deductions are not recorded for this gate pass',
+        'MISSING_BOOKING_DEDUCTIONS'
+      );
+    }
+
+    await assertShedDeductionsRestorable(shedDeductions, session);
+    if (bookingDeductions.length > 0) {
+      await assertBookingDeductionsRestorable(bookingDeductions, session);
+    }
+
+    await assertFinanceSaleCanBeNulled({
+      coldStorageId: coldStorageObjectId,
+      dispatchId: nikasi._id as Types.ObjectId,
+      session,
+    });
+
+    for (const deduction of shedDeductions) {
+      if (deduction.quantity <= 0) {
+        continue;
+      }
+
+      const updateResult = await OutgoingGatePass.updateOne(
+        {
+          _id: deduction.outgoingGatePassId,
+          status: OutgoingGatePassStatus.ACTIVE,
+        },
+        {
+          $inc: {
+            'orderDetails.$[elem].quantityIssued': deduction.quantity,
+          },
+        },
+        {
+          arrayFilters: [
+            {
+              'elem.size': deduction.size,
+              'elem.bagType': deduction.bagType,
+              'elem.chamber': deduction.chamber,
+              'elem.floor': deduction.floor,
+              'elem.row': deduction.row,
+            },
+          ],
+          session,
+        }
+      );
+
+      if (updateResult.modifiedCount !== 1) {
+        throw new ConflictError(
+          'Outgoing gate pass quantity could not be restored',
+          'CONCURRENT_MODIFICATION'
+        );
+      }
+    }
+
+    for (const deduction of bookingDeductions) {
+      if (deduction.quantity <= 0) {
+        continue;
+      }
+
+      const updateResult = await Booking.updateOne(
+        {
+          _id: deduction.bookingId,
+          bagSizes: {
+            $elemMatch: {
+              size: deduction.size,
+              variety: deduction.variety,
+            },
+          },
+        },
+        {
+          $inc: {
+            'bagSizes.$.currentQuantity': deduction.quantity,
+          },
+        },
+        { session }
+      );
+
+      if (updateResult.modifiedCount !== 1) {
+        throw new ConflictError(
+          'Booking quantity could not be restored',
+          'CONCURRENT_MODIFICATION'
+        );
+      }
+    }
+
+    const nulledAt = new Date();
+    const updated = await NikasiGatePass.findOneAndUpdate(
+      {
+        _id: nikasi._id,
+        status: { $ne: NikasiGatePassStatus.NULL },
+      },
+      {
+        $set: {
+          status: NikasiGatePassStatus.NULL,
+          nulledAt,
+          ...(nulledBy && mongoose.Types.ObjectId.isValid(nulledBy)
+            ? { nulledBy: new Types.ObjectId(nulledBy) }
+            : {}),
+        },
+      },
+      { session, returnDocument: 'after' }
+    );
+
+    if (!updated) {
+      throw new ConflictError(
+        'Nikasi gate pass could not be marked null',
+        'CONCURRENT_MODIFICATION'
+      );
+    }
+
+    await voidFinanceSaleForDispatch({
+      coldStorageId: coldStorageObjectId,
+      dispatchId: nikasi._id as Types.ObjectId,
+      session,
+    });
+
+    await session.commitTransaction();
+    await updated.populate(billBookPopulate);
+    return withLiveBillBookName(updated);
+  } catch (error) {
+    await session.abortTransaction().catch(() => {});
+    handleServiceError(error, logger);
+  } finally {
+    session.endSession();
+  }
+}
+
+/**
  * Retrieves nikasi gate passes for a cold storage with pagination.
  */
 export async function getPaginatedNikasiGatePassesByColdStorage(
@@ -690,6 +1028,7 @@ export async function getPaginatedNikasiGatePassesByColdStorage(
 
     const match: Record<string, unknown> = {
       dispatchLedgerId: { $in: dispatchLedgerIds },
+      status: { $ne: NikasiGatePassStatus.NULL },
     };
 
     if (options.dateFrom) {
@@ -810,6 +1149,7 @@ export async function searchNikasiGatePassesByNumber(
     const filter = {
       $and: [
         { dispatchLedgerId: { $in: dispatchLedgerIds } },
+        { status: { $ne: NikasiGatePassStatus.NULL } },
         {
           $or: [
             { gatePassNo: number },
@@ -899,6 +1239,7 @@ type NikasiGatePassReportLean = {
     name?: string;
   } | null;
   gatePassNo: number;
+  status?: 'ACTIVE' | 'NULL';
   manualGatePassNumber?: number;
   isBooked?: boolean;
   billNumber?: number;
@@ -955,6 +1296,7 @@ function mapNikasiGatePassToReport(
     _id: toObjectIdString(pass._id),
     dispatchLedgerId: dispatchLedger,
     gatePassNo: pass.gatePassNo,
+    status: pass.status ?? 'ACTIVE',
     date: formatReportDateTime(pass.date),
     category: pass.category,
     bagSize,
@@ -1075,6 +1417,7 @@ export async function getNikasiGatePassReport(
 
     const filter: Record<string, unknown> = {
       dispatchLedgerId: { $in: dispatchLedgerIds },
+      status: { $ne: NikasiGatePassStatus.NULL },
     };
 
     if (options.dateFrom != null || options.dateTo != null) {

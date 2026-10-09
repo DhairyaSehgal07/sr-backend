@@ -23,6 +23,8 @@ export interface IFinanceJournal extends Document {
   narration: string;
   lines: IFinanceJournalLine[];
   createdBy?: Types.ObjectId;
+  /** Set when the source sale is marked null. The original lines stay for audit. */
+  voidedAt?: Date;
   createdAt: Date;
 }
 
@@ -95,6 +97,9 @@ const FinanceJournalSchema = new Schema<IFinanceJournal>(
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: 'StoreAdmin',
+    },
+    voidedAt: {
+      type: Date,
     },
   },
   {

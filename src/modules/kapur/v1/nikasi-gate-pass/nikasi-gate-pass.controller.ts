@@ -1,14 +1,17 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { ZodError } from 'zod';
 import {
   createNikasiGatePass,
   getNikasiGatePassReport,
   getPaginatedNikasiGatePassesByColdStorage,
+  markNikasiGatePassNull,
   searchNikasiGatePassesByNumber,
 } from './nikasi-gate-pass.service.js';
 import {
   createNikasiGatePassSchema,
   CreateNikasiGatePassInput,
   GetNikasiGatePassReportQuery,
+  markNikasiGatePassNullParamsSchema,
   SearchNikasiGatePassInput,
 } from './nikasi-gate-pass.schema.js';
 import {
@@ -150,6 +153,89 @@ export async function createNikasiGatePassHandler(
         statusCode: error.statusCode,
         errorCode: error.code,
         message: error.message,
+      });
+    }
+
+    const statusCode = 500;
+    return reply.code(statusCode).send({
+      status: 'error',
+      statusCode,
+      errorCode: 'INTERNAL_SERVER_ERROR',
+      message:
+        process.env.NODE_ENV === 'development'
+          ? error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred'
+          : 'An unexpected error occurred',
+    });
+  }
+}
+
+/**
+ * Handler for undoing a nikasi gate pass: restores stock and voids the finance sale.
+ */
+export async function markNikasiGatePassNullHandler(
+  request: FastifyRequest<{ Params: { nikasiGatePassId: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const params = markNikasiGatePassNullParamsSchema.parse(request.params);
+    const coldStorageId = getColdStorageIdFromRequest(request);
+    const storeAdminId = (request as AuthenticatedRequest).user?.id;
+
+    request.log.info(
+      { nikasiGatePassId: params.nikasiGatePassId },
+      'Mark nikasi gate pass null request'
+    );
+
+    const result = await markNikasiGatePassNull(
+      coldStorageId,
+      params.nikasiGatePassId,
+      request.log,
+      storeAdminId
+    );
+
+    return reply.send({
+      status: 'Success',
+      message: 'Nikasi gate pass marked null.',
+      data: result,
+    });
+  } catch (error) {
+    request.log.error(
+      { error, nikasiGatePassId: request.params.nikasiGatePassId },
+      'Error in markNikasiGatePassNullHandler'
+    );
+
+    if (error instanceof UnauthorizedError) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof ConflictError ||
+      error instanceof ValidationError ||
+      error instanceof NotFoundError ||
+      error instanceof AppError
+    ) {
+      return reply.code(error.statusCode).send({
+        status: 'error',
+        statusCode: error.statusCode,
+        errorCode: error.code,
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        status: 'error',
+        statusCode: 400,
+        errorCode: 'VALIDATION_ERROR',
+        message: error.issues.map((issue) => issue.message).join(', '),
       });
     }
 

@@ -3,6 +3,7 @@ import {
   createNikasiGatePassHandler,
   getNikasiGatePassReportHandler,
   getNikasiGatePassesByColdStorageHandler,
+  markNikasiGatePassNullHandler,
   searchNikasiGatePassHandler,
 } from './nikasi-gate-pass.controller.js';
 import {
@@ -25,6 +26,16 @@ const nikasiGatePassItemProperties = {
     description: 'Populated store admin who created the pass',
   },
   gatePassNo: { type: 'number', description: 'Gate pass number' },
+  status: {
+    type: 'string',
+    enum: ['ACTIVE', 'NULL'],
+    description: 'ACTIVE, or NULL after the pass is undone',
+  },
+  nulledAt: {
+    type: 'string',
+    format: 'date-time',
+    description: 'When the pass was marked null',
+  },
   manualGatePassNumber: {
     type: 'number',
     description: 'Manual gate pass number',
@@ -252,12 +263,88 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
+    '/:nikasiGatePassId/mark-null',
+    {
+      schema: {
+        description:
+          'Mark a nikasi gate pass as null. Restores the outgoing-to-shed and booking quantities deducted at create time, marks the linked finance sale null, and voids its journal. The gate pass document is kept so its number stays taken. Refuses when the sale already has recoveries, the pass is already null, stored deductions are missing, or a targeted outgoing pass is not active.',
+        tags: ['Nikasi Gate Pass'],
+        summary: 'Mark nikasi gate pass as null',
+        params: {
+          type: 'object',
+          required: ['nikasiGatePassId'],
+          properties: {
+            nikasiGatePassId: {
+              type: 'string',
+              description: 'Nikasi gate pass ID',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'Nikasi gate pass marked null',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+              data: {
+                type: 'object',
+                properties: nikasiGatePassItemProperties,
+                additionalProperties: true,
+              },
+            },
+          },
+          400: {
+            description:
+              'Bad request (missing deductions, inactive outgoing pass, or finance sale has recoveries)',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          404: {
+            description: 'Nikasi gate pass or finance sale not found',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          409: {
+            description: 'Gate pass is already null',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+      preHandler: [authenticate],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    markNikasiGatePassNullHandler as never
+  );
+
+  fastify.post(
     '/search',
     {
       schema: {
         ...searchNikasiGatePassSchema,
         description:
-          "Search nikasi gate passes for the authenticated store admin's cold storage. Matches documents where the provided number equals gatePassNo, manualGatePassNumber, billNumber, bitliNumber, the current bill book name, or biltiBook.",
+          "Search active nikasi gate passes for the authenticated store admin's cold storage. Passes marked null are omitted. Matches documents where the provided number equals gatePassNo, manualGatePassNumber, billNumber, bitliNumber, the current bill book name, or biltiBook.",
         tags: ['Nikasi Gate Pass'],
         summary: 'Search nikasi gate passes by number',
         body: {
@@ -340,7 +427,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
       schema: {
         ...getNikasiGatePassReportSchema,
         description:
-          "Get nikasi gate pass report rows for the authenticated store admin's cold storage without pagination. Optional inclusive date range via dateFrom and dateTo (ISO dates). Sorted by gate pass number descending.",
+          "Get active nikasi gate pass report rows for the authenticated store admin's cold storage without pagination. Passes marked null are omitted. Optional inclusive date range via dateFrom and dateTo (ISO dates). Sorted by gate pass number descending.",
         tags: ['Nikasi Gate Pass'],
         summary: 'Get nikasi gate pass report',
         querystring: {
@@ -424,7 +511,7 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          "Get nikasi gate passes for the authenticated store admin's cold storage. Supports pagination (limit, page), sortOrder (asc | desc) by gate pass number (default desc), and optional filters dateFrom/dateTo (inclusive).",
+          "Get active nikasi gate passes for the authenticated store admin's cold storage. Passes marked null are omitted. Supports pagination (limit, page), sortOrder (asc | desc) by gate pass number (default desc), and optional filters dateFrom/dateTo (inclusive).",
         tags: ['Nikasi Gate Pass'],
         summary: 'Get all nikasi gate passes for current cold storage',
         querystring: {

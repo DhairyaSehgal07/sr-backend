@@ -122,6 +122,7 @@ export async function getOverview(
     };
     const matchNikasi: Record<string, unknown> = {
       dispatchLedgerId: { $in: dispatchLedgerIds },
+      status: { $ne: 'NULL' },
     };
     if (filters.dateFrom) {
       const start = new Date(filters.dateFrom);

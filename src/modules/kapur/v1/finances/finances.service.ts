@@ -180,6 +180,114 @@ export async function postFinanceSaleFromNikasi(
   return sale;
 }
 
+async function loadFinanceSaleForNull(params: {
+  coldStorageId: Types.ObjectId;
+  dispatchId: Types.ObjectId;
+  session: ClientSession;
+}) {
+  const sale = await FinanceSale.findOne({
+    coldStorageId: params.coldStorageId,
+    dispatchId: params.dispatchId,
+  }).session(params.session);
+
+  if (!sale) {
+    throw new NotFoundError(
+      'Finance sale not found for this gate pass',
+      'FINANCE_SALE_NOT_FOUND'
+    );
+  }
+
+  if (sale.recoveredPaise > 0) {
+    throw new ValidationError(
+      'Finance sale has recoveries and cannot be marked null',
+      'FINANCE_SALE_HAS_RECOVERY'
+    );
+  }
+
+  const journal = await FinanceJournal.findOne({
+    coldStorageId: params.coldStorageId,
+    'source.collection': 'finance_sales',
+    'source.id': sale._id,
+  }).session(params.session);
+
+  if (!journal) {
+    throw new NotFoundError(
+      'Finance journal not found for this sale',
+      'FINANCE_JOURNAL_NOT_FOUND'
+    );
+  }
+
+  if (journal.voidedAt) {
+    throw new ConflictError(
+      'Finance journal is already void',
+      'FINANCE_JOURNAL_ALREADY_VOID'
+    );
+  }
+
+  return { sale, journal };
+}
+
+/** Read-only guard used before stock is restored. */
+export async function assertFinanceSaleCanBeNulled(params: {
+  coldStorageId: Types.ObjectId;
+  dispatchId: Types.ObjectId;
+  session: ClientSession;
+}): Promise<void> {
+  await loadFinanceSaleForNull(params);
+}
+
+/**
+ * Marks the finance sale posted for a nikasi document as null and voids its
+ * journal. Refuses when any amount has already been recovered.
+ */
+export async function voidFinanceSaleForDispatch(params: {
+  coldStorageId: Types.ObjectId;
+  dispatchId: Types.ObjectId;
+  session: ClientSession;
+}): Promise<void> {
+  const { sale, journal } = await loadFinanceSaleForNull(params);
+
+  const saleUpdate = await FinanceSale.updateOne(
+    {
+      _id: sale._id,
+      recoveredPaise: 0,
+      status: { $ne: 'null' },
+    },
+    { $set: { status: 'null', outstandingPaise: 0 } },
+    { session: params.session }
+  );
+
+  if (saleUpdate.modifiedCount !== 1) {
+    throw new ConflictError(
+      'Finance sale could not be marked null',
+      'CONCURRENT_MODIFICATION'
+    );
+  }
+
+  const journalUpdate = await FinanceJournal.updateOne(
+    { _id: journal._id, voidedAt: { $exists: false } },
+    { $set: { voidedAt: new Date() } },
+    { session: params.session }
+  );
+
+  if (journalUpdate.modifiedCount !== 1) {
+    throw new ConflictError(
+      'Finance journal could not be voided',
+      'CONCURRENT_MODIFICATION'
+    );
+  }
+}
+
+/** Sales marked null stay in the collection but must not affect billed or outstanding totals. */
+function excludeNullSales(
+  filter: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    ...filter,
+    status: { $ne: 'null' },
+  };
+}
+
 function coldStorageFilter(
   coldStorageId: string,
   query: GetFinanceListQuery
@@ -247,11 +355,11 @@ export async function createFinanceRecovery(
       outstandingPaise: number;
     }>([
       {
-        $match: {
+        $match: excludeNullSales({
           coldStorageId: coldStorageObjectId,
           dispatchLedgerId: dispatchLedger._id,
           billBookId: billBook._id,
-        },
+        }),
       },
       {
         $group: {
@@ -392,6 +500,7 @@ export async function getFinanceSummary(
     );
 
     const match = coldStorageFilter(coldStorageId, query);
+    const salesMatch = excludeNullSales(match);
 
     const [salesAgg, recoveryAgg] = await Promise.all([
       FinanceSale.aggregate<{
@@ -400,7 +509,7 @@ export async function getFinanceSummary(
         outstandingPaise: number;
         saleCount: number;
       }>([
-        { $match: match },
+        { $match: salesMatch },
         {
           $group: {
             _id: null,
@@ -474,7 +583,7 @@ export async function getFinanceSales(
     );
 
     const sales = await FinanceSale.find(
-      coldStorageFilter(coldStorageId, query)
+      excludeNullSales(coldStorageFilter(coldStorageId, query))
     )
       .sort({ date: -1, gatePassNo: -1 })
       .lean();
@@ -509,10 +618,10 @@ export async function getFinanceOutstanding(
 
     const outstanding = await FinanceSale.aggregate([
       {
-        $match: {
+        $match: excludeNullSales({
           ...coldStorageFilter(coldStorageId, query),
           outstandingPaise: { $gt: 0 },
-        },
+        }),
       },
       {
         $group: {

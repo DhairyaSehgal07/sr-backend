@@ -52,7 +52,7 @@ const financeSaleSchema = {
     amountPaise: { type: 'number' },
     recoveredPaise: { type: 'number' },
     outstandingPaise: { type: 'number' },
-    status: { type: 'string', enum: ['open', 'partial', 'settled'] },
+    status: { type: 'string', enum: ['open', 'partial', 'settled', 'null'] },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time' },
   },
@@ -134,7 +134,8 @@ export async function financesRoutes(fastify: FastifyInstance) {
     {
       schema: {
         ...getFinanceListQuerySchema,
-        description: 'List finance sales sorted by date descending',
+        description:
+          'List finance sales sorted by date descending. Sales marked null are omitted.',
         tags: ['Finances'],
         summary: 'Finance sales tab',
         querystring: billBookQuerystring,

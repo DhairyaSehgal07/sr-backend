@@ -4,11 +4,35 @@ import mongoose, { Schema, Document, Types, Model } from 'mongoose';
    INTERFACES
 ======================= */
 
+export enum NikasiGatePassStatus {
+  ACTIVE = 'ACTIVE',
+  NULL = 'NULL',
+}
+
 interface INikasiBagSize {
   size: string;
   variety: string;
   quantityIssued: number;
   costPerBag: number;
+}
+
+/** Exact outgoing-to-shed line reduced when this pass was created */
+export interface INikasiShedDeduction {
+  outgoingGatePassId: Types.ObjectId;
+  size: string;
+  bagType: string;
+  chamber: string;
+  floor: string;
+  row: string;
+  quantity: number;
+}
+
+/** Exact booking line reduced when this pass was created with isBooked */
+export interface INikasiBookingDeduction {
+  bookingId: Types.ObjectId;
+  size: string;
+  variety: string;
+  quantity: number;
 }
 
 export interface INikasiGatePass extends Document {
@@ -17,6 +41,11 @@ export interface INikasiGatePass extends Document {
   gatePassNo: number;
   manualGatePassNumber?: number;
   isBooked?: boolean;
+  status: NikasiGatePassStatus;
+  nulledAt?: Date;
+  nulledBy?: Types.ObjectId;
+  shedDeductions: INikasiShedDeduction[];
+  bookingDeductions: INikasiBookingDeduction[];
 
   billNumber?: number;
   bitliNumber?: number;
@@ -54,6 +83,37 @@ export interface INikasiGatePass extends Document {
 /* =======================
    SUB SCHEMAS
 ======================= */
+
+const NikasiShedDeductionSchema = new Schema<INikasiShedDeduction>(
+  {
+    outgoingGatePassId: {
+      type: Schema.Types.ObjectId,
+      ref: 'OutgoingGatePass',
+      required: true,
+    },
+    size: { type: String, required: true, trim: true },
+    bagType: { type: String, required: true, trim: true },
+    chamber: { type: String, required: true, trim: true },
+    floor: { type: String, required: true, trim: true },
+    row: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
+
+const NikasiBookingDeductionSchema = new Schema<INikasiBookingDeduction>(
+  {
+    bookingId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Booking',
+      required: true,
+    },
+    size: { type: String, required: true, trim: true },
+    variety: { type: String, required: true, trim: true },
+    quantity: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+);
 
 const NikasiBagSizeSchema = new Schema<INikasiBagSize>(
   {
@@ -116,6 +176,32 @@ const NikasiGatePassSchema = new Schema<INikasiGatePass>(
     isBooked: {
       type: Boolean,
       default: false,
+    },
+
+    status: {
+      type: String,
+      enum: Object.values(NikasiGatePassStatus),
+      default: NikasiGatePassStatus.ACTIVE,
+      required: true,
+    },
+
+    nulledAt: {
+      type: Date,
+    },
+
+    nulledBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'StoreAdmin',
+    },
+
+    shedDeductions: {
+      type: [NikasiShedDeductionSchema],
+      default: [],
+    },
+
+    bookingDeductions: {
+      type: [NikasiBookingDeductionSchema],
+      default: [],
     },
 
     billNumber: {

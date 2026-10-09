@@ -12,7 +12,7 @@ export function billedPaiseFromBagLines(
   );
 }
 
-export type FinanceSaleStatus = 'open' | 'partial' | 'settled';
+export type FinanceSaleStatus = 'open' | 'partial' | 'settled' | 'null';
 
 export function saleStatusFromAmounts(
   amountPaise: number,

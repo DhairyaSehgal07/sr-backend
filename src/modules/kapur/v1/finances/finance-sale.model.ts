@@ -94,7 +94,7 @@ const FinanceSaleSchema = new Schema<IFinanceSale>(
     },
     status: {
       type: String,
-      enum: ['open', 'partial', 'settled'],
+      enum: ['open', 'partial', 'settled', 'null'],
       required: true,
       default: 'open',
     },
