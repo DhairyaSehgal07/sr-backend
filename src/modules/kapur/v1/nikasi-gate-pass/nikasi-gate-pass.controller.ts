@@ -6,6 +6,7 @@ import {
   getPaginatedNikasiGatePassesByColdStorage,
   markNikasiGatePassNull,
   searchNikasiGatePassesByNumber,
+  updateNikasiGatePass,
 } from './nikasi-gate-pass.service.js';
 import {
   createNikasiGatePassSchema,
@@ -13,6 +14,8 @@ import {
   GetNikasiGatePassReportQuery,
   markNikasiGatePassNullParamsSchema,
   SearchNikasiGatePassInput,
+  updateNikasiGatePassSchema,
+  UpdateNikasiGatePassInput,
 } from './nikasi-gate-pass.schema.js';
 import {
   AppError,
@@ -204,6 +207,94 @@ export async function markNikasiGatePassNullHandler(
     request.log.error(
       { error, nikasiGatePassId: request.params.nikasiGatePassId },
       'Error in markNikasiGatePassNullHandler'
+    );
+
+    if (error instanceof UnauthorizedError) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof ConflictError ||
+      error instanceof ValidationError ||
+      error instanceof NotFoundError ||
+      error instanceof AppError
+    ) {
+      return reply.code(error.statusCode).send({
+        status: 'error',
+        statusCode: error.statusCode,
+        errorCode: error.code,
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        status: 'error',
+        statusCode: 400,
+        errorCode: 'VALIDATION_ERROR',
+        message: error.issues.map((issue) => issue.message).join(', '),
+      });
+    }
+
+    const statusCode = 500;
+    return reply.code(statusCode).send({
+      status: 'error',
+      statusCode,
+      errorCode: 'INTERNAL_SERVER_ERROR',
+      message:
+        process.env.NODE_ENV === 'development'
+          ? error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred'
+          : 'An unexpected error occurred',
+    });
+  }
+}
+
+/**
+ * Handler for editing header fields on an active nikasi gate pass.
+ */
+export async function updateNikasiGatePassHandler(
+  request: FastifyRequest<{
+    Params: { id: string };
+    Body: UpdateNikasiGatePassInput;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const parsed = updateNikasiGatePassSchema.parse({
+      params: request.params,
+      body: request.body,
+    });
+    const coldStorageId = getColdStorageIdFromRequest(request);
+
+    request.log.info(
+      { nikasiGatePassId: parsed.params.id },
+      'Update nikasi gate pass request'
+    );
+
+    const result = await updateNikasiGatePass(
+      coldStorageId,
+      parsed.params.id,
+      parsed.body,
+      request.log
+    );
+
+    return reply.send({
+      status: 'Success',
+      message: 'Nikasi gate pass updated successfully.',
+      data: result,
+    });
+  } catch (error) {
+    request.log.error(
+      { error, params: request.params, body: request.body },
+      'Error in updateNikasiGatePassHandler'
     );
 
     if (error instanceof UnauthorizedError) {

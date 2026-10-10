@@ -236,6 +236,107 @@ export async function assertFinanceSaleCanBeNulled(params: {
   await loadFinanceSaleForNull(params);
 }
 
+export interface SyncFinanceSaleHeaderParams {
+  coldStorageId: Types.ObjectId;
+  dispatchId: Types.ObjectId;
+  session: ClientSession;
+  date?: Date;
+  dispatchLedger?: {
+    id: Types.ObjectId;
+    name: string;
+  };
+}
+
+/**
+ * Patches the sale posted for a nikasi document, and its sale journal, when
+ * the gate pass date or dispatch ledger changes. Recoveries are left as posted.
+ * A ledger move is refused once any amount has been recovered.
+ */
+export async function syncFinanceSaleHeader(
+  params: SyncFinanceSaleHeaderParams
+): Promise<void> {
+  if (!params.date && !params.dispatchLedger) {
+    return;
+  }
+
+  const sale = await FinanceSale.findOne({
+    coldStorageId: params.coldStorageId,
+    dispatchId: params.dispatchId,
+  }).session(params.session);
+
+  if (!sale) {
+    throw new NotFoundError(
+      'Finance sale not found for this gate pass',
+      'FINANCE_SALE_NOT_FOUND'
+    );
+  }
+
+  if (sale.status === 'null') {
+    throw new ConflictError(
+      'Finance sale is already null',
+      'FINANCE_SALE_ALREADY_NULL'
+    );
+  }
+
+  if (params.dispatchLedger && sale.recoveredPaise > 0) {
+    throw new ValidationError(
+      'Dispatch ledger cannot be changed because this sale already has recoveries',
+      'FINANCE_SALE_HAS_RECOVERY'
+    );
+  }
+
+  const journal = await FinanceJournal.findOne({
+    coldStorageId: params.coldStorageId,
+    'source.collection': 'finance_sales',
+    'source.id': sale._id,
+  }).session(params.session);
+
+  if (!journal) {
+    throw new NotFoundError(
+      'Finance journal not found for this sale',
+      'FINANCE_JOURNAL_NOT_FOUND'
+    );
+  }
+
+  if (journal.voidedAt) {
+    throw new ConflictError(
+      'Finance journal is already void',
+      'FINANCE_JOURNAL_ALREADY_VOID'
+    );
+  }
+
+  if (params.date) {
+    sale.date = params.date;
+    journal.date = params.date;
+  }
+
+  if (params.dispatchLedger) {
+    sale.dispatchLedgerId = params.dispatchLedger.id;
+    sale.dispatchLedgerName = params.dispatchLedger.name;
+
+    let updatedLedgerLine = false;
+    for (const line of journal.lines) {
+      if (line.account === 'dispatch_ledger') {
+        line.dispatchLedgerId = params.dispatchLedger.id;
+        updatedLedgerLine = true;
+      }
+    }
+
+    if (!updatedLedgerLine) {
+      throw new ValidationError(
+        'Finance journal is missing a dispatch ledger line',
+        'FINANCE_JOURNAL_LINE_MISSING'
+      );
+    }
+
+    journal.narration = `Sale from gate pass ${sale.gatePassNo} — ${params.dispatchLedger.name} / ${sale.billBookName}`;
+    journal.markModified('lines');
+  }
+
+  await sale.save({ session: params.session });
+  await journal.save({ session: params.session });
+}
+
 /**
  * Marks the finance sale posted for a nikasi document as null and voids its
  * journal. Refuses when any amount has already been recovered.

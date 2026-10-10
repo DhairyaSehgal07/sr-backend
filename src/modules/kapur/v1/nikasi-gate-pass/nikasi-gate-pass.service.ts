@@ -18,6 +18,7 @@ import { OUTGOING_TO_SHED_CATEGORY } from '../outgoing-gate-pass/outgoing-gate-p
 import type {
   CreateNikasiGatePassInput,
   NikasiReport,
+  UpdateNikasiGatePassInput,
 } from './nikasi-gate-pass.schema.js';
 import { BillBook } from '../bill-book/bill-book.model.js';
 import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
@@ -25,6 +26,7 @@ import { billedPaiseFromBagLines } from '../finances/money.js';
 import {
   assertFinanceSaleCanBeNulled,
   postFinanceSaleFromNikasi,
+  syncFinanceSaleHeader,
   voidFinanceSaleForDispatch,
 } from '../finances/finances.service.js';
 import {
@@ -991,6 +993,196 @@ export async function markNikasiGatePassNull(
     await session.commitTransaction();
     await updated.populate(billBookPopulate);
     return withLiveBillBookName(updated);
+  } catch (error) {
+    await session.abortTransaction().catch(() => {});
+    handleServiceError(error, logger);
+  } finally {
+    session.endSession();
+  }
+}
+
+const CLEARABLE_NIKASI_FIELDS = [
+  'from',
+  'to',
+  'truckNumber',
+  'transportCompany',
+  'LSNumber',
+  'driverName',
+  'owner',
+  'remarks',
+] as const;
+
+function applyClearableField(
+  nikasi: INikasiGatePass,
+  field: (typeof CLEARABLE_NIKASI_FIELDS)[number],
+  value: string | null | undefined
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  nikasi.set(field, value === null ? undefined : value);
+}
+
+/**
+ * Updates header fields on an active nikasi gate pass. A dispatch ledger or
+ * date change is written through to the matching finance sale and sale journal.
+ */
+export async function updateNikasiGatePass(
+  coldStorageId: string,
+  nikasiGatePassId: string,
+  payload: UpdateNikasiGatePassInput,
+  logger?: FastifyBaseLogger
+): Promise<INikasiGatePass> {
+  if (!mongoose.Types.ObjectId.isValid(coldStorageId)) {
+    throw new ValidationError(
+      'Invalid cold storage ID format',
+      'INVALID_COLD_STORAGE_ID'
+    );
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(nikasiGatePassId)) {
+    throw new ValidationError(
+      'Invalid nikasi gate pass ID format',
+      'INVALID_NIKASI_GATE_PASS_ID'
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const coldStorageObjectId = new Types.ObjectId(coldStorageId);
+    const dispatchLedgerIds = await DispatchLedger.find({
+      coldStorageId: coldStorageObjectId,
+    })
+      .session(session)
+      .distinct('_id');
+
+    const nikasi = await NikasiGatePass.findOne({
+      _id: new Types.ObjectId(nikasiGatePassId),
+      dispatchLedgerId: { $in: dispatchLedgerIds },
+    }).session(session);
+
+    if (!nikasi) {
+      throw new NotFoundError(
+        'Nikasi gate pass not found',
+        'NIKASI_GATE_PASS_NOT_FOUND'
+      );
+    }
+
+    if (nikasi.status === NikasiGatePassStatus.NULL) {
+      throw new ConflictError(
+        'A null nikasi gate pass cannot be edited',
+        'NIKASI_GATE_PASS_NULL'
+      );
+    }
+
+    const requestedLedgerId = payload.dispatchLedgerId;
+    const ledgerIsChanging =
+      requestedLedgerId !== undefined &&
+      requestedLedgerId !== String(nikasi.dispatchLedgerId);
+
+    let nextDispatchLedger: { _id: Types.ObjectId; name: string } | undefined;
+
+    if (ledgerIsChanging && requestedLedgerId) {
+      const booked =
+        nikasi.isBooked === true || (nikasi.bookingDeductions?.length ?? 0) > 0;
+
+      if (booked) {
+        throw new ValidationError(
+          'Dispatch ledger cannot be changed because this gate pass deducted booked stock',
+          'DISPATCH_LEDGER_CHANGE_BOOKED'
+        );
+      }
+
+      const dispatchLedger = await DispatchLedger.findOne({
+        _id: new Types.ObjectId(requestedLedgerId),
+        coldStorageId: coldStorageObjectId,
+      })
+        .session(session)
+        .select('name');
+
+      if (!dispatchLedger) {
+        throw new NotFoundError(
+          'Dispatch ledger not found',
+          'DISPATCH_LEDGER_NOT_FOUND'
+        );
+      }
+
+      const duplicateGatePass = await NikasiGatePass.findOne({
+        _id: { $ne: nikasi._id },
+        dispatchLedgerId: dispatchLedger._id,
+        gatePassNo: nikasi.gatePassNo,
+      })
+        .session(session)
+        .select('_id')
+        .lean();
+
+      if (duplicateGatePass) {
+        throw new ConflictError(
+          `Gate pass number ${nikasi.gatePassNo} already exists on the selected dispatch ledger`,
+          'GATE_PASS_NUMBER_EXISTS'
+        );
+      }
+
+      nextDispatchLedger = {
+        _id: dispatchLedger._id as Types.ObjectId,
+        name: dispatchLedger.name,
+      };
+      nikasi.dispatchLedgerId = dispatchLedger._id as Types.ObjectId;
+    }
+
+    if (payload.manualGatePassNumber !== undefined) {
+      nikasi.set(
+        'manualGatePassNumber',
+        payload.manualGatePassNumber === null
+          ? undefined
+          : payload.manualGatePassNumber
+      );
+    }
+
+    if (payload.category !== undefined) {
+      nikasi.category = payload.category;
+    }
+
+    const dateIsChanging =
+      payload.date !== undefined &&
+      payload.date.getTime() !== nikasi.date.getTime();
+
+    if (payload.date !== undefined) {
+      nikasi.date = payload.date;
+    }
+
+    for (const field of CLEARABLE_NIKASI_FIELDS) {
+      applyClearableField(nikasi, field, payload[field]);
+    }
+
+    if (dateIsChanging || nextDispatchLedger) {
+      await syncFinanceSaleHeader({
+        coldStorageId: coldStorageObjectId,
+        dispatchId: nikasi._id as Types.ObjectId,
+        session,
+        ...(dateIsChanging && payload.date ? { date: payload.date } : {}),
+        ...(nextDispatchLedger && {
+          dispatchLedger: {
+            id: nextDispatchLedger._id,
+            name: nextDispatchLedger.name,
+          },
+        }),
+      });
+    }
+
+    await nikasi.save({ session });
+    await session.commitTransaction();
+    await nikasi.populate(billBookPopulate);
+
+    logger?.info(
+      { nikasiGatePassId, coldStorageId },
+      'Nikasi gate pass updated'
+    );
+
+    return withLiveBillBookName(nikasi);
   } catch (error) {
     await session.abortTransaction().catch(() => {});
     handleServiceError(error, logger);

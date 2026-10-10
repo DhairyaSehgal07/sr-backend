@@ -5,6 +5,7 @@ import {
   getNikasiGatePassesByColdStorageHandler,
   markNikasiGatePassNullHandler,
   searchNikasiGatePassHandler,
+  updateNikasiGatePassHandler,
 } from './nikasi-gate-pass.controller.js';
 import {
   getNikasiGatePassReportSchema,
@@ -260,6 +261,151 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
       },
     },
     createNikasiGatePassHandler as never
+  );
+
+  fastify.put(
+    '/:id',
+    {
+      schema: {
+        description:
+          'Update header fields on an active nikasi gate pass. Allowed fields: manualGatePassNumber, category, date, dispatchLedgerId, from, to, truckNumber, transportCompany, LSNumber, driverName, owner, remarks. Omit a field to leave it unchanged. Pass null to clear an optional field. Changing dispatchLedgerId or date also updates the matching finance sale and its sale journal. A dispatch ledger change is refused when the pass deducted booked stock or the sale already has recoveries. Bag lines, gate pass number, bill book, weights, and status cannot be changed.',
+        tags: ['Nikasi Gate Pass'],
+        summary: 'Update nikasi gate pass',
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: {
+              type: 'string',
+              description: 'Nikasi gate pass ID',
+            },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: {
+            manualGatePassNumber: {
+              type: ['number', 'null'],
+              description:
+                'Manual gate pass number. Pass null to clear the value.',
+            },
+            category: { type: 'string', description: 'Category' },
+            date: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Gate pass date',
+            },
+            dispatchLedgerId: {
+              type: 'string',
+              description:
+                'Dispatch ledger ID. Also updates the finance sale and sale journal.',
+            },
+            from: {
+              type: ['string', 'null'],
+              description: 'Source location. Pass null to clear.',
+            },
+            to: {
+              type: ['string', 'null'],
+              description: 'Destination location. Pass null to clear.',
+            },
+            truckNumber: {
+              type: ['string', 'null'],
+              description: 'Truck number. Pass null to clear.',
+            },
+            transportCompany: {
+              type: ['string', 'null'],
+              description: 'Transport company. Pass null to clear.',
+            },
+            LSNumber: {
+              type: ['string', 'null'],
+              description: 'LS number. Pass null to clear.',
+            },
+            driverName: {
+              type: ['string', 'null'],
+              description: 'Driver name. Pass null to clear.',
+            },
+            owner: {
+              type: ['string', 'null'],
+              description: 'Owner. Pass null to clear.',
+            },
+            remarks: {
+              type: ['string', 'null'],
+              description: 'Remarks. Pass null to clear.',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'Nikasi gate pass updated successfully',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+              data: {
+                type: 'object',
+                properties: nikasiGatePassItemProperties,
+                additionalProperties: true,
+              },
+            },
+          },
+          400: {
+            description:
+              'Bad request (validation error, booked stock, or finance sale has recoveries)',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          401: {
+            description: 'Unauthorized or missing cold storage context',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+          404: {
+            description:
+              'Nikasi gate pass, dispatch ledger, or finance sale not found',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          409: {
+            description:
+              'Conflict (null pass, void journal, or gate pass number already exists on the target ledger)',
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              statusCode: { type: 'number' },
+              errorCode: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+      preHandler: [authenticate],
+      config: {
+        rateLimit: {
+          max: 60,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    updateNikasiGatePassHandler as never
   );
 
   fastify.post(

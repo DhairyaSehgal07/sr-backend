@@ -175,6 +175,81 @@ export type MarkNikasiGatePassNullParams = z.infer<
   typeof markNikasiGatePassNullParamsSchema
 >;
 
+const clearableString = (label: string, max?: number) => {
+  let stringSchema = z
+    .string()
+    .trim()
+    .min(1, `${label} must be non-empty if provided`);
+
+  if (max !== undefined) {
+    stringSchema = stringSchema.max(
+      max,
+      `${label} must not exceed ${max} characters`
+    );
+  }
+
+  return z.union([stringSchema, z.null()]).optional();
+};
+
+export const updateNikasiGatePassSchema = z.object({
+  params: z.object({
+    id: z
+      .string()
+      .trim()
+      .min(1, 'Nikasi gate pass ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid nikasi gate pass ID format'
+      ),
+  }),
+  body: z
+    .object({
+      manualGatePassNumber: z
+        .union([
+          z.coerce
+            .number()
+            .int('Manual gate pass number must be an integer')
+            .positive('Manual gate pass number must be a positive number'),
+          z.null(),
+        ])
+        .optional(),
+      category: z
+        .string()
+        .trim()
+        .min(1, 'Category must be non-empty if provided')
+        .optional(),
+      date: z.coerce.date().optional(),
+      dispatchLedgerId: z
+        .string()
+        .trim()
+        .min(1, 'Dispatch ledger ID is required')
+        .refine(
+          (val) => mongoose.Types.ObjectId.isValid(val),
+          'Invalid dispatch ledger ID format'
+        )
+        .optional(),
+      from: clearableString('From'),
+      to: clearableString('To'),
+      truckNumber: clearableString('Truck number', 50),
+      transportCompany: clearableString('Transport company'),
+      LSNumber: clearableString('LS number'),
+      driverName: clearableString('Driver name'),
+      owner: clearableString('Owner'),
+      remarks: clearableString('Remarks', 500),
+    })
+    .refine(
+      (body) => Object.values(body).some((value) => value !== undefined),
+      { message: 'At least one field is required for update' }
+    ),
+});
+
+export type UpdateNikasiGatePassParams = z.infer<
+  typeof updateNikasiGatePassSchema
+>['params'];
+export type UpdateNikasiGatePassInput = z.infer<
+  typeof updateNikasiGatePassSchema
+>['body'];
+
 export interface NikasiReportBagSize {
   size: string;
   variety: string;
