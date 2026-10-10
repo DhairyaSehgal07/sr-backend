@@ -13,6 +13,11 @@ export interface IColdStorage extends Document {
   mobileNumber: string;
   capacity: number;
   imageUrl?: string;
+  /** Digits only, stored as a string so a leading zero is kept (for example 01083). */
+  jpgaNumber?: string;
+  tagline?: string;
+  /** Full phone line, printed as stored. */
+  contactNumbers?: string;
   isPaid: boolean;
   isActive: boolean;
   plan: Plan;
@@ -32,6 +37,9 @@ const ColdStorageSchema = new Schema<IColdStorage>(
     mobileNumber: { type: String, required: true, unique: true },
     capacity: { type: Number, required: true },
     imageUrl: { type: String, default: '' },
+    jpgaNumber: { type: String, trim: true },
+    tagline: { type: String, trim: true },
+    contactNumbers: { type: String, trim: true },
     isPaid: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     plan: { type: String, enum: Object.values(Plan), default: Plan.Enterprise },

@@ -3,6 +3,7 @@ import { Preferences } from '../preferences/preferences.model.js';
 import {
   CreateColdStorageInput,
   GetColdStoragesQuery,
+  UpdateColdStorageDisplayInput,
 } from './cold-storage.schema.js';
 import {
   ConflictError,
@@ -232,6 +233,87 @@ export async function getColdStorageById(
       'Failed to retrieve cold storage',
       500,
       'GET_COLD_STORAGE_BY_ID_ERROR'
+    );
+  }
+}
+
+const DISPLAY_FIELDS = ['jpgaNumber', 'tagline', 'contactNumbers'] as const;
+
+/**
+ * Sets or clears JPGA number, tagline, and contact line on a cold storage.
+ */
+export async function updateColdStorageDisplay(
+  id: string,
+  payload: UpdateColdStorageDisplayInput,
+  logger?: FastifyBaseLogger
+) {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new ValidationError('Invalid cold storage ID format', 'INVALID_ID');
+    }
+
+    const $set: Record<string, string> = {};
+    const $unset: Record<string, 1> = {};
+
+    for (const field of DISPLAY_FIELDS) {
+      const value = payload[field];
+      if (value === undefined) {
+        continue;
+      }
+      if (value === null) {
+        $unset[field] = 1;
+      } else {
+        $set[field] = value;
+      }
+    }
+
+    const update: Record<string, unknown> = {};
+    if (Object.keys($set).length > 0) {
+      update.$set = $set;
+    }
+    if (Object.keys($unset).length > 0) {
+      update.$unset = $unset;
+    }
+
+    const coldStorage = await ColdStorage.findByIdAndUpdate(id, update, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('preferencesId')
+      .lean();
+
+    if (!coldStorage) {
+      throw new NotFoundError(
+        'Cold storage not found',
+        'COLD_STORAGE_NOT_FOUND'
+      );
+    }
+
+    logger?.info({ coldStorageId: id }, 'Updated cold storage display fields');
+
+    return coldStorage;
+  } catch (error) {
+    if (error instanceof NotFoundError || error instanceof ValidationError) {
+      throw error;
+    }
+
+    if (error instanceof mongoose.Error.ValidationError) {
+      const messages = Object.values(error.errors).map((err) => err.message);
+      throw new ValidationError(
+        messages.join(', '),
+        'MONGOOSE_VALIDATION_ERROR'
+      );
+    }
+
+    logger?.error(
+      { error, id, payload },
+      'Unexpected error updating cold storage display fields'
+    );
+
+    throw new AppError(
+      'Failed to update cold storage',
+      500,
+      'UPDATE_COLD_STORAGE_ERROR'
     );
   }
 }

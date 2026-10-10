@@ -1,13 +1,18 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
+import { ZodError } from 'zod';
 import {
   createColdStorage,
   getColdStorages,
   getColdStorageById,
+  updateColdStorageDisplay,
 } from './cold-storage.service.js';
 import {
   CreateColdStorageInput,
   GetColdStoragesQuery,
   GetColdStorageByIdParams,
+  UpdateColdStorageDisplayInput,
+  UpdateColdStorageDisplayParams,
+  updateColdStorageDisplaySchema,
 } from './cold-storage.schema.js';
 import {
   AppError,
@@ -184,6 +189,77 @@ export async function getColdStorageByIdHandler(
     }
 
     // Fallback for unexpected errors
+    return reply.code(500).send({
+      success: false,
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message:
+          process.env.NODE_ENV === 'development'
+            ? error instanceof Error
+              ? error.message
+              : 'An unexpected error occurred'
+            : 'An unexpected error occurred',
+      },
+    });
+  }
+}
+
+/**
+ * Handler for setting or clearing JPGA number, tagline, and contact line.
+ */
+export async function updateColdStorageDisplayHandler(
+  request: FastifyRequest<{
+    Params: UpdateColdStorageDisplayParams;
+    Body: UpdateColdStorageDisplayInput;
+  }>,
+  reply: FastifyReply
+) {
+  try {
+    const parsed = updateColdStorageDisplaySchema.parse({
+      params: request.params,
+      body: request.body,
+    });
+    const coldStorage = await updateColdStorageDisplay(
+      parsed.params.id,
+      parsed.body,
+      request.log
+    );
+
+    return reply.send({
+      success: true,
+      data: coldStorage,
+      message: 'Cold storage updated successfully',
+    });
+  } catch (error) {
+    request.log.error(
+      { error, params: request.params, body: request.body },
+      'Error in updateColdStorageDisplayHandler'
+    );
+
+    if (
+      error instanceof NotFoundError ||
+      error instanceof ValidationError ||
+      error instanceof AppError
+    ) {
+      return reply.code(error.statusCode).send({
+        success: false,
+        error: {
+          code: error.code,
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ZodError) {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: error.issues.map((issue) => issue.message).join(', '),
+        },
+      });
+    }
+
     return reply.code(500).send({
       success: false,
       error: {

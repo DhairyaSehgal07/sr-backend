@@ -736,20 +736,39 @@ export async function getDaybook(
   }
 }
 
+function optionalDisplayValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
 function toLoginColdStorageSummary(coldStorage: {
   _id: mongoose.Types.ObjectId | string;
   name: string;
   address: string;
   capacity: number;
   imageUrl?: string;
+  jpgaNumber?: string;
+  tagline?: string;
+  contactNumbers?: string;
   isPaid: boolean;
 }): LoginColdStorageSummary {
+  const jpgaNumber = optionalDisplayValue(coldStorage.jpgaNumber);
+  const tagline = optionalDisplayValue(coldStorage.tagline);
+  const contactNumbers = optionalDisplayValue(coldStorage.contactNumbers);
+
   return {
     _id: String(coldStorage._id),
     name: coldStorage.name,
     address: coldStorage.address,
     capacity: coldStorage.capacity,
     imageUrl: coldStorage.imageUrl,
+    ...(jpgaNumber && { jpgaNumber }),
+    ...(tagline && { tagline }),
+    ...(contactNumbers && { contactNumbers }),
     isPaid: coldStorage.isPaid,
   };
 }
@@ -765,6 +784,9 @@ function toLoginStoreAdminResponse(storeAdmin: {
         address: string;
         capacity: number;
         imageUrl?: string;
+        jpgaNumber?: string;
+        tagline?: string;
+        contactNumbers?: string;
         isPaid: boolean;
       } & Record<string, unknown>)
     | null;
@@ -811,7 +833,8 @@ export async function loginStoreAdmin(
       .select('+password')
       .populate({
         path: 'coldStorageId',
-        select: 'name address capacity imageUrl isPaid',
+        select:
+          'name address capacity imageUrl isPaid jpgaNumber tagline contactNumbers',
       })
       .lean();
 

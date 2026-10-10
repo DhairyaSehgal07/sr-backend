@@ -14,6 +14,9 @@ export type LoginColdStorageSummary = {
   address: string;
   capacity: number;
   imageUrl?: string;
+  jpgaNumber?: string;
+  tagline?: string;
+  contactNumbers?: string;
   isPaid: boolean;
 };
 

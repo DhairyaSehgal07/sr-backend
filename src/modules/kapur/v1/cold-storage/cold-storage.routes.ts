@@ -3,6 +3,7 @@ import {
   createColdStorageHandler,
   getColdStoragesHandler,
   getColdStorageByIdHandler,
+  updateColdStorageDisplayHandler,
 } from './cold-storage.controller.js';
 import {
   getPreferencesHandler,
@@ -252,6 +253,89 @@ export async function coldStorageRoutes(fastify: FastifyInstance) {
       },
     },
     updatePreferencesHandler
+  );
+
+  fastify.patch(
+    '/:id',
+    {
+      schema: {
+        description:
+          'Set or clear the JPGA number, tagline, and contact line used on printed documents. Pass null to clear a field. Omit a field to leave it unchanged.',
+        tags: ['Cold Storage'],
+        summary: 'Update cold storage display fields',
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', description: 'Cold storage ID' },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: {
+            jpgaNumber: {
+              type: ['string', 'null'],
+              description:
+                'JPGA number digits only, such as 01083. Pass null to clear.',
+            },
+            tagline: {
+              type: ['string', 'null'],
+              description: 'Tagline. Pass null to clear.',
+            },
+            contactNumbers: {
+              type: ['string', 'null'],
+              description: 'Full phone line. Pass null to clear.',
+            },
+          },
+        },
+        response: {
+          200: {
+            description: 'Cold storage updated',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              data: { type: 'object', additionalProperties: true },
+              message: { type: 'string' },
+            },
+          },
+          400: {
+            description: 'Bad request',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+          404: {
+            description: 'Cold storage not found',
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              error: {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+      },
+      config: {
+        rateLimit: {
+          max: 30,
+          timeWindow: '1 minute',
+        },
+      },
+    },
+    updateColdStorageDisplayHandler
   );
 
   // Get cold storage by ID

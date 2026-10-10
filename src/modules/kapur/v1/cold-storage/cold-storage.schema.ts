@@ -29,6 +29,26 @@ export const createColdStorageSchema = z.object({
 
     imageUrl: z.string().trim().url('Image URL must be a valid URL').optional(),
 
+    jpgaNumber: z
+      .string()
+      .trim()
+      .regex(/^\d+$/, 'JPGA number must contain digits only')
+      .optional(),
+
+    tagline: z
+      .string()
+      .trim()
+      .min(1, 'Tagline must be non-empty if provided')
+      .max(200, 'Tagline must not exceed 200 characters')
+      .optional(),
+
+    contactNumbers: z
+      .string()
+      .trim()
+      .min(1, 'Contact numbers must be non-empty if provided')
+      .max(200, 'Contact numbers must not exceed 200 characters')
+      .optional(),
+
     plan: z.nativeEnum(Plan).optional(),
   }),
 });
@@ -69,3 +89,54 @@ export type GetColdStoragesQuery = z.infer<
 export type GetColdStorageByIdParams = z.infer<
   typeof getColdStorageByIdParamsSchema
 >['params'];
+
+const clearableDisplayString = (label: string, max: number) =>
+  z
+    .union([
+      z
+        .string()
+        .trim()
+        .min(1, `${label} must be non-empty if provided`)
+        .max(max, `${label} must not exceed ${max} characters`),
+      z.null(),
+    ])
+    .optional();
+
+export const updateColdStorageDisplaySchema = z.object({
+  params: z.object({
+    id: z
+      .string()
+      .trim()
+      .min(1, 'ID is required')
+      .refine(
+        (val) => mongoose.Types.ObjectId.isValid(val),
+        'Invalid ID format'
+      ),
+  }),
+  body: z
+    .object({
+      jpgaNumber: z
+        .union([
+          z
+            .string()
+            .trim()
+            .regex(/^\d+$/, 'JPGA number must contain digits only'),
+          z.null(),
+        ])
+        .optional(),
+      tagline: clearableDisplayString('Tagline', 200),
+      contactNumbers: clearableDisplayString('Contact numbers', 200),
+    })
+    .refine(
+      (body) => Object.values(body).some((value) => value !== undefined),
+      { message: 'At least one field is required for update' }
+    ),
+});
+
+export type UpdateColdStorageDisplayParams = z.infer<
+  typeof updateColdStorageDisplaySchema
+>['params'];
+
+export type UpdateColdStorageDisplayInput = z.infer<
+  typeof updateColdStorageDisplaySchema
+>['body'];

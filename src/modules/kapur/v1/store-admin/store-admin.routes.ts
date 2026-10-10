@@ -556,6 +556,19 @@ export async function storeAdminRoutes(fastify: FastifyInstance) {
                       address: { type: 'string' },
                       capacity: { type: 'number' },
                       imageUrl: { type: 'string' },
+                      jpgaNumber: {
+                        type: 'string',
+                        description:
+                          'JPGA number digits only, such as 01083. Omitted when unset.',
+                      },
+                      tagline: {
+                        type: 'string',
+                        description: 'Tagline. Omitted when unset.',
+                      },
+                      contactNumbers: {
+                        type: 'string',
+                        description: 'Full phone line. Omitted when unset.',
+                      },
                       isPaid: { type: 'boolean' },
                     },
                     required: ['_id', 'name', 'address', 'capacity', 'isPaid'],
