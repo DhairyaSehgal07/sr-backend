@@ -36,8 +36,6 @@ export const createNikasiGatePassSchema = z.object({
     .positive('Manual gate pass number must be a positive number')
     .optional(),
 
-  isBooked: z.boolean().optional(),
-
   billNumber: z.coerce
     .number()
     .int('Bill number must be an integer')
@@ -212,7 +210,6 @@ export interface NikasiReport {
   createdBy?: NikasiReportCreatedBy;
   gatePassNo: number;
   manualGatePassNumber?: number;
-  isBooked?: boolean;
   billNumber?: number;
   bitliNumber?: number;
   billBookId?: string;

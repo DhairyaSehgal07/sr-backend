@@ -14,6 +14,8 @@ import { dispatchLedgerRoutes } from './modules/kapur/v1/dispatch-ledger/dispatc
 import { billBookRoutes } from './modules/kapur/v1/bill-book/bill-book.routes.js';
 import { financesRoutes } from './modules/kapur/v1/finances/finances.routes.js';
 import { outgoingGatePassRoutes } from './modules/kapur/v1/outgoing-gate-pass/outgoing-gate-pass.routes.js';
+import { coldStoreStockRoutes } from './modules/kapur/v1/cold-store-stock/cold-store-stock.routes.js';
+import { stockFilterRoutes } from './modules/kapur/v1/stock-filter/stock-filter.routes.js';
 config();
 
 export const buildApp = async (): Promise<FastifyInstance> => {
@@ -122,6 +124,16 @@ export const buildApp = async (): Promise<FastifyInstance> => {
   // Register finances routes
   await fastify.register(financesRoutes, {
     prefix: '/api/v1/finances',
+  });
+
+  // Register cold store stock routes
+  await fastify.register(coldStoreStockRoutes, {
+    prefix: '/api/v1/cold-store-stock',
+  });
+
+  // Register stock filter routes
+  await fastify.register(stockFilterRoutes, {
+    prefix: '/api/v1/stock-filter',
   });
 
   // Global error handler

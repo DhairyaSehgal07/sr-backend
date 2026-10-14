@@ -83,7 +83,6 @@ export async function createNikasiGatePassHandler(
         bagSizeCount: request.body.bagSize?.length ?? 0,
         gatePassNo: request.body.gatePassNo,
         date: request.body.date,
-        isBooked: request.body.isBooked ?? false,
       },
       'Create nikasi gate pass request'
     );

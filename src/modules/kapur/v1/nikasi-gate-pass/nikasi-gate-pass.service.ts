@@ -17,6 +17,7 @@ import { BillBook } from '../bill-book/bill-book.model.js';
 import { getActiveBillBookById } from '../bill-book/bill-book.service.js';
 import { billedPaiseFromBagLines } from '../finances/money.js';
 import { postFinanceSaleFromNikasi } from '../finances/finances.service.js';
+import { decrementColdStoreStockForDispatch } from '../cold-store-stock/cold-store-stock.service.js';
 import {
   AppError,
   ConflictError,
@@ -122,8 +123,8 @@ function handleServiceError(error: unknown, logger?: FastifyBaseLogger): never {
 }
 
 /**
- * Creates a nikasi gate pass from the submitted bag lines.
- * isBooked is stored as a flag and does not deduct stock.
+ * Creates a nikasi gate pass from the submitted bag lines and reduces
+ * cold-store stock for each variety and size.
  */
 export async function createNikasiGatePass(
   coldStorageId: string,
@@ -147,7 +148,6 @@ export async function createNikasiGatePass(
         bagSizeCount: payload.bagSize.length,
         gatePassNo: payload.gatePassNo,
         date: payload.date,
-        isBooked: payload.isBooked ?? false,
       },
       'Starting nikasi gate pass create'
     );
@@ -234,7 +234,6 @@ export async function createNikasiGatePass(
       ...(payload.manualGatePassNumber !== undefined && {
         manualGatePassNumber: payload.manualGatePassNumber,
       }),
-      ...(payload.isBooked !== undefined && { isBooked: payload.isBooked }),
       ...(payload.billNumber !== undefined && {
         billNumber: payload.billNumber,
       }),
@@ -316,7 +315,6 @@ export async function createNikasiGatePass(
           quantityIssued: line.quantityIssued,
           costPerBag: line.costPerBag,
         })),
-        isBooked: nikasiGatePass.isBooked ?? false,
         ...(nikasiGatePass.billNumber !== undefined && {
           billNumber: nikasiGatePass.billNumber,
         }),
@@ -325,6 +323,12 @@ export async function createNikasiGatePass(
         }),
       },
     }).save({ session });
+
+    await decrementColdStoreStockForDispatch(
+      coldStorageId,
+      payload.bagSize,
+      session
+    );
 
     await session.commitTransaction();
     await nikasiGatePass.populate(billBookPopulate);
@@ -657,7 +661,6 @@ type NikasiGatePassReportLean = {
   } | null;
   gatePassNo: number;
   manualGatePassNumber?: number;
-  isBooked?: boolean;
   billNumber?: number;
   bitliNumber?: number;
   billBookId?:
@@ -727,10 +730,6 @@ function mapNikasiGatePassToReport(
 
   if (pass.manualGatePassNumber != null) {
     report.manualGatePassNumber = pass.manualGatePassNumber;
-  }
-
-  if (pass.isBooked != null) {
-    report.isBooked = pass.isBooked;
   }
 
   if (pass.billNumber != null) {

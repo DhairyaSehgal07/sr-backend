@@ -28,6 +28,8 @@ import { BillBook } from '../modules/kapur/v1/bill-book/bill-book.model.js';
 import { FinanceSale } from '../modules/kapur/v1/finances/finance-sale.model.js';
 import { FinanceRecovery } from '../modules/kapur/v1/finances/finance-recovery.model.js';
 import { FinanceJournal } from '../modules/kapur/v1/finances/finance-journal.model.js';
+import { ColdStoreStock } from '../modules/kapur/v1/cold-store-stock/cold-store-stock.model.js';
+import { StockFilter } from '../modules/kapur/v1/stock-filter/stock-filter.model.js';
 
 const MODELS = [
   ColdStorage,
@@ -45,6 +47,8 @@ const MODELS = [
   FinanceSale,
   FinanceRecovery,
   FinanceJournal,
+  ColdStoreStock,
+  StockFilter,
 ] as const;
 
 async function syncIndexes(): Promise<void> {

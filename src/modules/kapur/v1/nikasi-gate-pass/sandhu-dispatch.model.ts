@@ -16,7 +16,6 @@ export interface ISandhuDispatch extends Document {
   createdBy?: Types.ObjectId;
   gatePassNo: number;
   manualGatePassNumber?: number;
-  isBooked?: boolean;
 
   billNumber?: number;
   bitliNumber?: number;
@@ -111,11 +110,6 @@ const SandhuDispatchSchema = new Schema<ISandhuDispatch>(
 
     manualGatePassNumber: {
       type: Number,
-    },
-
-    isBooked: {
-      type: Boolean,
-      default: false,
     },
 
     billNumber: {

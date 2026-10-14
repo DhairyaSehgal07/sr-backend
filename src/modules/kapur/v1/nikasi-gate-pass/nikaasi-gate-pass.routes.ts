@@ -31,10 +31,6 @@ const nikasiGatePassItemProperties = {
     type: 'number',
     description: 'Manual gate pass number',
   },
-  isBooked: {
-    type: 'boolean',
-    description: 'Stored flag; does not deduct booking stock',
-  },
   billNumber: { type: 'number', description: 'Bill number' },
   bitliNumber: { type: 'number', description: 'Bitli number' },
   billBookId: {
@@ -113,10 +109,6 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
             manualGatePassNumber: {
               type: 'number',
               description: 'Optional manual gate pass number',
-            },
-            isBooked: {
-              type: 'boolean',
-              description: 'Whether this nikasi gate pass is booked',
             },
             billNumber: {
               type: 'number',
