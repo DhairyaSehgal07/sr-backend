@@ -63,7 +63,7 @@ const ColdStoreStockSchema = new Schema<IColdStoreStock>(
 );
 
 ColdStoreStockSchema.index(
-  { coldStorageId: 1, variety: 1, 'size.name': 1 },
+  { coldStorageId: 1, variety: 1, 'size.name': 1, stockFilter: 1 },
   { unique: true }
 );
 

@@ -111,6 +111,13 @@ export const createNikasiGatePassSchema = z.object({
     .max(500, 'Remarks must not exceed 500 characters')
     .optional(),
 
+  stockFilter: z
+    .string()
+    .trim()
+    .min(1, 'Stock filter must be non-empty if provided')
+    .max(100, 'Stock filter must not exceed 100 characters')
+    .optional(),
+
   netWeight: z.coerce.number().optional(),
 
   averageWeightPerBag: z.coerce.number().optional(),
@@ -228,6 +235,7 @@ export interface NikasiReport {
   bagSize: NikasiReportBagSize[];
   totalBags: number;
   remarks?: string;
+  stockFilter?: string;
   netWeight?: number;
   averageWeightPerBag?: number;
 }

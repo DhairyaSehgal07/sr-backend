@@ -56,7 +56,7 @@ export async function coldStoreStockRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          "Create current stock for one variety and size in the authenticated store admin's cold storage",
+          "Create current stock for one variety, size, and stock filter in the authenticated store admin's cold storage. The same variety and size can exist once per filter.",
         tags: ['Cold Store Stock'],
         summary: 'Create cold store stock',
         body: {
@@ -191,7 +191,7 @@ export async function coldStoreStockRoutes(fastify: FastifyInstance) {
     {
       schema: {
         description:
-          'Update current quantity, initial quantity, variety, size name, or stock filter for one stock row. A cold store still has only one row per variety and size.',
+          'Update current quantity, initial quantity, variety, size name, or stock filter for one stock row. A cold store has one row per variety, size, and stock filter.',
         tags: ['Cold Store Stock'],
         summary: 'Update cold store stock',
         params: idParams,

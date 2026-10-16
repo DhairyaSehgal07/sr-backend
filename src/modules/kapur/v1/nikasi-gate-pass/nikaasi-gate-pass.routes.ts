@@ -69,6 +69,11 @@ const nikasiGatePassItemProperties = {
     },
   },
   remarks: { type: 'string', description: 'Remarks' },
+  stockFilter: {
+    type: 'string',
+    description:
+      'Optional stock filter. When set, this dispatch reduces only the cold-store stock row with this filter.',
+  },
   netWeight: { type: 'number', description: 'Net weight' },
   averageWeightPerBag: {
     type: 'number',
@@ -176,6 +181,11 @@ export async function nikasiGatePassRoutes(fastify: FastifyInstance) {
               },
             },
             remarks: { type: 'string', description: 'Remarks' },
+            stockFilter: {
+              type: 'string',
+              description:
+                'Optional stock filter. Stock is reduced only for this filter, variety, and size.',
+            },
             netWeight: { type: 'number', description: 'Net weight' },
             averageWeightPerBag: {
               type: 'number',

@@ -8,8 +8,10 @@ BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 TOKEN="${TOKEN:-paste-jwt-here}"
 STOCK_ID="${STOCK_ID:-paste-stock-id-here}"
 
-# Create one stock row for a variety and size.
-# 409 if this cold store already has that variety and size.
+# Create one stock row for a variety, size, and stock filter.
+# 409 if this cold store already has that variety, size, and filter.
+# The same variety and size can exist once per filter. Rows with no filter
+# are their own bucket.
 curl -sS -X POST "$BASE_URL/api/v1/cold-store-stock" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
@@ -52,7 +54,7 @@ curl -sS -X GET "$BASE_URL/api/v1/cold-store-stock/$STOCK_ID" \
 echo
 
 # Update current quantity, initial quantity, variety, size name, or stock filter.
-# Send only the fields you want to change. Still one row per variety and size.
+# Send only the fields you want to change. One row per variety, size, and filter.
 curl -sS -X PUT "$BASE_URL/api/v1/cold-store-stock/$STOCK_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \

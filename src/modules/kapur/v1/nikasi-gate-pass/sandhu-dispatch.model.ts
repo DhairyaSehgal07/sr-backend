@@ -40,6 +40,9 @@ export interface ISandhuDispatch extends Document {
 
   remarks?: string;
 
+  /** Selects which cold-store stock bucket this dispatch reduces */
+  stockFilter?: string;
+
   netWeight?: number;
   averageWeightPerBag?: number;
 
@@ -200,6 +203,11 @@ const SandhuDispatchSchema = new Schema<ISandhuDispatch>(
     },
 
     remarks: {
+      type: String,
+      trim: true,
+    },
+
+    stockFilter: {
       type: String,
       trim: true,
     },

@@ -36,6 +36,17 @@ function coldStorageObjectId(coldStorageId: string) {
   return new mongoose.Types.ObjectId(coldStorageId);
 }
 
+/** Named filters match exactly. An omitted filter matches only rows with no filter. */
+function stockFilterQuery(stockFilter?: string | null) {
+  if (stockFilter) {
+    return { stockFilter };
+  }
+  return { stockFilter: null };
+}
+
+const STOCK_EXISTS_MESSAGE =
+  'Stock already exists for this variety, size, and stock filter';
+
 export async function createColdStoreStock(
   coldStorageId: string,
   payload: CreateColdStoreStockInput,
@@ -52,13 +63,11 @@ export async function createColdStoreStock(
       coldStorageId: coldStorageObjectId(coldStorageId),
       variety: payload.variety,
       'size.name': payload.size.name,
+      ...stockFilterQuery(payload.stockFilter),
     }).lean();
 
     if (existing) {
-      throw new ConflictError(
-        'Stock already exists for this variety and size',
-        'COLD_STORE_STOCK_EXISTS'
-      );
+      throw new ConflictError(STOCK_EXISTS_MESSAGE, 'COLD_STORE_STOCK_EXISTS');
     }
 
     const stock = await ColdStoreStock.create({
@@ -98,10 +107,7 @@ export async function createColdStoreStock(
     }
 
     if (isDuplicateKeyError(error)) {
-      throw new ConflictError(
-        'Stock already exists for this variety and size',
-        'COLD_STORE_STOCK_EXISTS'
-      );
+      throw new ConflictError(STOCK_EXISTS_MESSAGE, 'COLD_STORE_STOCK_EXISTS');
     }
 
     logger?.error(
@@ -243,19 +249,21 @@ export async function updateColdStoreStock(
 
     const nextVariety = payload.variety ?? stock.variety;
     const nextSizeName = payload.size?.name ?? stock.size.name;
+    const nextStockFilter =
+      payload.stockFilter !== undefined
+        ? payload.stockFilter
+        : stock.stockFilter;
 
     const existing = await ColdStoreStock.findOne({
       _id: { $ne: stock._id },
       coldStorageId: stock.coldStorageId,
       variety: nextVariety,
       'size.name': nextSizeName,
+      ...stockFilterQuery(nextStockFilter),
     }).lean();
 
     if (existing) {
-      throw new ConflictError(
-        'Stock already exists for this variety and size',
-        'COLD_STORE_STOCK_EXISTS'
-      );
+      throw new ConflictError(STOCK_EXISTS_MESSAGE, 'COLD_STORE_STOCK_EXISTS');
     }
 
     stock.variety = nextVariety;
@@ -296,10 +304,7 @@ export async function updateColdStoreStock(
     }
 
     if (isDuplicateKeyError(error)) {
-      throw new ConflictError(
-        'Stock already exists for this variety and size',
-        'COLD_STORE_STOCK_EXISTS'
-      );
+      throw new ConflictError(STOCK_EXISTS_MESSAGE, 'COLD_STORE_STOCK_EXISTS');
     }
 
     logger?.error(
@@ -392,12 +397,14 @@ async function decrementOneStockRow(
   variety: string,
   sizeName: string,
   quantity: number,
-  session: ClientSession
+  session: ClientSession,
+  stockFilter?: string
 ) {
   const filter = {
     coldStorageId,
     variety,
     'size.name': sizeName,
+    ...stockFilterQuery(stockFilter),
   };
   const update = {
     $inc: { 'size.currentQuantity': -quantity },
@@ -406,6 +413,7 @@ async function decrementOneStockRow(
       variety,
       'size.name': sizeName,
       'size.initialQuantity': 0,
+      ...(stockFilter ? { stockFilter } : {}),
     },
   };
 
@@ -437,14 +445,17 @@ async function decrementOneStockRow(
 }
 
 /**
- * Subtracts dispatched bag quantities from currentQuantity on the single
- * stock row for each variety and size. Missing rows are created with a
- * negative current balance and an initial quantity of zero.
+ * Subtracts dispatched bag quantities from currentQuantity on the stock row
+ * for each variety, size, and stock filter. A named filter only touches that
+ * bucket. An omitted filter only touches rows with no stock filter. Missing
+ * rows are created with a negative current balance and an initial quantity
+ * of zero.
  */
 export async function decrementColdStoreStockForDispatch(
   coldStorageId: string,
   lines: DispatchStockLine[],
-  session: ClientSession
+  session: ClientSession,
+  stockFilter?: string
 ) {
   const storageId = new Types.ObjectId(coldStorageId);
 
@@ -454,7 +465,8 @@ export async function decrementColdStoreStockForDispatch(
       line.variety,
       line.size,
       line.quantity,
-      session
+      session,
+      stockFilter
     );
   }
 }

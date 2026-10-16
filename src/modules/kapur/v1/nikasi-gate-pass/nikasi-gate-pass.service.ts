@@ -124,7 +124,7 @@ function handleServiceError(error: unknown, logger?: FastifyBaseLogger): never {
 
 /**
  * Creates a nikasi gate pass from the submitted bag lines and reduces
- * cold-store stock for each variety and size.
+ * cold-store stock for each variety, size, and stock filter.
  */
 export async function createNikasiGatePass(
   coldStorageId: string,
@@ -264,6 +264,9 @@ export async function createNikasiGatePass(
       ...(payload.owner !== undefined && { owner: payload.owner }),
       bagSize: payload.bagSize,
       ...(payload.remarks !== undefined && { remarks: payload.remarks }),
+      ...(payload.stockFilter !== undefined && {
+        stockFilter: payload.stockFilter,
+      }),
       ...(payload.netWeight !== undefined && { netWeight: payload.netWeight }),
       ...(payload.averageWeightPerBag !== undefined && {
         averageWeightPerBag: payload.averageWeightPerBag,
@@ -321,13 +324,17 @@ export async function createNikasiGatePass(
         ...(nikasiGatePass.netWeight !== undefined && {
           netWeight: nikasiGatePass.netWeight,
         }),
+        ...(nikasiGatePass.stockFilter !== undefined && {
+          stockFilter: nikasiGatePass.stockFilter,
+        }),
       },
     }).save({ session });
 
     await decrementColdStoreStockForDispatch(
       coldStorageId,
       payload.bagSize,
-      session
+      session,
+      payload.stockFilter
     );
 
     await session.commitTransaction();
@@ -688,6 +695,7 @@ type NikasiGatePassReportLean = {
     costPerBag?: number;
   }>;
   remarks?: string;
+  stockFilter?: string;
   netWeight?: number;
   averageWeightPerBag?: number;
 };
@@ -797,6 +805,10 @@ function mapNikasiGatePassToReport(
 
   if (pass.remarks != null) {
     report.remarks = pass.remarks;
+  }
+
+  if (pass.stockFilter != null) {
+    report.stockFilter = pass.stockFilter;
   }
 
   if (pass.netWeight != null) {
